@@ -1,82 +1,127 @@
-<div align="center">
+# ilmi Task
 
-# 🦊 ilmi Task
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.44+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
+  <img src="https://img.shields.io/badge/SQLite-sqflite%202.4-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Design-Obsidian%20%26%20Amber-FF5500?style=for-the-badge" alt="Obsidian and Amber" />
+  <img src="https://img.shields.io/badge/Tests-22%2F22%20Passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests" />
+  <img src="https://img.shields.io/badge/Author-Racc%20Lab-9CA3AF?style=for-the-badge" alt="Racc Lab" />
+</p>
 
-**System-Grade Contextual Reminder & Task Engine**  
-*Engineered with a bespoke Linear / Things 3 / Nothing OS dark aesthetic.*
+<p align="center">
+  <a href="release/ilmi-Task-v1.0.0.apk">
+    <img src="https://img.shields.io/badge/Download-Release%20APK%20(v1.0.0)-FF5500?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+  </a>
+</p>
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=flat-square&logo=flutter&logoColor=white)](#)
-[![SQLite](https://img.shields.io/badge/SQLite-Relational_Engine-003B57?style=flat-square&logo=sqlite&logoColor=white)](#)
-[![Architecture](https://img.shields.io/badge/UI_System-Obsidian_%26_Amber-FF5500?style=flat-square)](#)
-[![Tests](https://img.shields.io/badge/Tests-Passing_100%25-10B981?style=flat-square)](#)
-[![Studio](https://img.shields.io/badge/Crafted_by-Racc_Lab-090A0C?style=flat-square)](#)
-
-</div>
-
----
-
-## ⚡ Overview
-
-**ilmi Task** is a high-precision, local-first contextual reminder and task management application built with Flutter. Inspired by the deep OS-level capabilities of **Samsung Reminder** and the editorial dark-mode ergonomics of **Linear**, **Things 3**, and **Nothing OS**, it moves beyond basic to-do lists by combining **multi-tier alarm channels**, **full-screen lock-screen wake triggers**, **geofencing (location-based triggers)**, and **interactive in-alarm checklists**.
+**ilmi Task** is an advanced, system-grade Reminder and Geofencing task management engine inspired by Samsung Reminder, Linear, and Nothing OS. Crafted by **Racc Lab**, it marries uncompromising background alarm reliability with a bespoke Matte Obsidian and Warm International Orange aesthetic.
 
 ---
 
-## ✨ Key Architectural Features
+## ⚡ Architecture & Feature Breakdown
 
-### 🚨 1. 3-Tier Notification & Full-Screen Alarm Engine
-Unlike standard task apps whose notifications get buried in the shade, **ilmi Task** implements three distinct Android Notification Channels paired with a dual-scheduling engine:
-* **Light (`light_channel`):** Silent, zero-vibration delivery for non-intrusive notes.
-* **Short (`short_channel`):** Standard system alert with default acoustic feedback.
-* **Strong / Full-Screen (`strong_fullscreen_channel`):** High-priority insistent alarm that wakes the screen over the lock screen (`USE_FULL_SCREEN_INTENT`) and launches a dedicated **Editorial Alarm Ringing Screen**.
-* **Early Pre-Alerts:** Dual-trigger scheduling (`-15m`, `-30m`, `-1h`, `-1d`) that notifies you ahead of the main deadline without prematurely triggering the full-screen dismissal flow.
+### Phase 1: Local Relational Database Engine (`sqflite`)
+- **Schema Architecture**: Normalized relational tables for `categories`, `reminders`, and `subtasks` with foreign key cascades and SQLite indexing.
+- **Data Persistence**: Offline-first local storage with pre-seeded categories (*Personal*, *Work*, *Shopping*, *Urgent*) and full CRUD operations.
+- **Desktop FFI Fallback**: Seamless cross-platform execution on Windows / Linux via `sqflite_common_ffi`.
 
-### 📍 2. Contextual Geofencing & Dark-Mode Map Picker
-* **Arrival & Departure Triggers:** Trigger reminders automatically when entering (`ARRIVE`) or leaving (`LEAVE`) a target radius (`100m`, `250m`, `500m`).
-* **Zero-API-Key Map Integration:** Built-in dark-themed interactive **OpenStreetMap** (`flutter_map`) coordinate picker with translucent `#FF5500` radius visualization.
-* **Deterministic Evaluation Engine:** Real-time distance calculation via `GeofenceMonitorService` with state-transition tracking (`outside -> inside` and `inside -> outside`).
+### Phase 2: 3-Tier Notification & Exact Alarm Engine
+- **Tier 1 — `light`**: Low-importance, silent notifications dropped quietly into the shade.
+- **Tier 2 — `short`**: Standard high-importance alert with default system ringtone and vibration.
+- **Tier 3 — `strong_fullscreen`**: Insistent looping alarm audio (`AudioAttributesUsage.alarm`), continuous heavy vibration pattern, and full-screen intent wakeup over locked screens (`showWhenLocked="true"`, `turnScreenOn="true"`).
+- **Dual-Scheduling & Pre-Alerts**: Pre-schedules early warnings (e.g. 15, 30, or 60 minutes before due time) without interfering with the main alarm trigger.
 
-### ☑️ 3. Interactive Subtasks & Smart Payload Extraction
-* **In-Card & In-Alarm Checklists:** Tick off subtasks directly from the Home Screen cards or live on the **Full-Screen Alarm Screen** while the alarm is ringing—persisted instantaneously to SQLite with `ON DELETE CASCADE`.
-* **Smart URL Extractor:** Automatically detects `http://` and `https://` links inside task notes and renders a monospace `[ ↗ OPEN LINK ]` action chip on the card.
-* **Visual Attachments:** Attach photos from camera or gallery directly to tasks.
+### Phase 3: Interactive Subtasks & Minimalist Linear UI
+- **In-Card Interactive Checklist**: Check off checklist items directly from the home screen card without navigating into edit modals.
+- **Reorderable Subtasks**: Drag-and-drop subtask reordering and live counter badges (`1/3`).
+- **Precision Typography**: Monospace timestamps, countdowns, and progress indicators.
+- **Bento Card Hierarchy**: Hairline 1px borders (`#22252C`), zero drop shadows, and category accent edge indicators.
 
-### 🛡️ 4. System Reliability & Battery Optimization Shield
-* Built-in diagnostic engine (`SystemShieldBanner` & `SystemShieldDialog`) monitoring:
-  * `Permission.notification`
-  * `Permission.scheduleExactAlarm`
-  * `Permission.ignoreBatteryOptimizations`
-  * `Permission.location` / `locationAlways`
-* Includes a one-tap **Android Doze Mode Exemption** action and an interactive **"Test Alarm Screen"** preview utility.
+### Phase 4: Full-Screen Alarm Screen & Battery Shield
+- **High-Contrast Alarm Screen**: High-priority wake screen displaying task title, notes, photo attachments, and a live ticking monospace digital clock.
+- **Live In-Alarm Checklist**: Interactive or read-only view of all subtasks right on the ringing screen.
+- **Action Controls**:
+  - `Snooze (+10 Mins)`: Atomically calculates $+10$ minutes and reschedules exact alarm.
+  - `Dismiss / Done`: Halts looping alarm audio, marks reminder completed in SQLite, and cleans notification tray.
+- **System Reliability Shield**: Direct status verification for Notifications, Exact Alarm scheduling (`SCHEDULE_EXACT_ALARM`), and Android Doze mode battery optimization exemption (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`).
+
+### Phase 5: CartoDB Dark Geofencing & Smart Link Detection
+- **Zero-API-Key Dark Map Picker**: Powered by `flutter_map` and CartoDB Dark Matter tiles with dynamic radius rings (`100m` to `1000m`) and GPS centering.
+- **Deterministic Geofence Monitoring**: State-tracked arrival and departure evaluation (`arrive`: outside $\rightarrow$ inside; `leave`: inside $\rightarrow$ outside) using `Geolocator.distanceBetween()`.
+- **Smart URL Link Extractor**: Regex detection in notes automatically surfaces a sleek `[ ↗ OPEN LINK ]` chip that opens web pages via `url_launcher`.
+
+---
+
+## 🧭 Notification & Intent Routing Architecture
+
+```mermaid
+flowchart TD
+    A["System Notification Triggered"] --> B{"Notification Payload"}
+    
+    B -->|"reminder_id"| C{"alert_severity"}
+    C -->|"strong_fullscreen"| D["AlarmRingingScreen (Full-Screen Alarm + Live Clock + Checklist)"]
+    C -->|"light or short"| E["HomeScreen -> Open ReminderEditorSheet"]
+    
+    B -->|"early_reminder_id"| F["HomeScreen -> Open Details (Prevent premature completion)"]
+    
+    B -->|"immediate_test_id"| D
+    
+    G["GeofenceMonitorService (GPS Stream)"] --> H{"Evaluate Distance <= Radius"}
+    H -->|"Transition: Outside -> Inside (arrive)"| I["showGeofenceNotification -> Push Alert"]
+    H -->|"Transition: Inside -> Outside (leave)"| I
+    H -->|"No Transition"| J["Update State Only"]
+```
 
 ---
 
 ## 🎨 Design System (`AppColors`)
 
-**ilmi Task** strictly rejects generic Material templates, heavy drop shadows, and saturated gradients in favor of `1px` hairline borders, matte carbon surfaces, and precision `monospace` metadata readouts:
-
-| Token Role | Hex Code | Visual Spec |
+| Token | Hex Value | Purpose |
 | :--- | :--- | :--- |
-| **Canvas Background** | `#090A0C` | Deep Matte Obsidian (`0dp` elevation) |
-| **Elevated Card Surface** | `#121418` | Subtle Charcoal with `1px` border (`#22252C`) |
-| **Bento Settings Container** | `#16191E` | Grouped architectural blocks with `1px` dividers |
-| **Indented Subtask Box** | `#0D0F12` | Recessed container for checklist items |
-| **Interactive Pill / Chip** | `#181B20` | Low-profile surface with `#2A2E37` border |
-| **Primary Accent** | `#FF5500` | International Orange / Warm Amber |
-| **Primary Typography** | `#F3F4F6` | Crisp Off-White (`letterSpacing: -0.6`) |
-| **Metadata & Readouts** | `monospace` | Used for timestamps, countdowns, `PINNED (n)`, and live clock |
+| `AppColors.canvas` | `#090A0C` | Deep Matte Obsidian background |
+| `AppColors.card` | `#121418` | Elevated charcoal surface with zero elevation |
+| `AppColors.cardBorder` | `#22252C` | Crisp 1px hairline card borders |
+| `AppColors.surfaceInteractive` | `#181B20` | Secondary surface for chips, pills, and inputs |
+| `AppColors.borderInteractive` | `#2A2E37` | Interactive component border |
+| `AppColors.accent` | `#FF5500` | International Orange primary accent & FAB |
+| `AppColors.textPrimary` | `#F3F4F6` | Off-white high-contrast text |
+| `AppColors.textSecondary` | `#9CA3AF` | Muted slate secondary text |
+| `AppColors.textMuted` | `#4B5563` | Subdued disabled text and timestamps |
+| `AppColors.danger` | `#EF4444` | Crimson destructive actions and alarms |
+| `AppColors.success` | `#10B981` | Emerald checklist completion and shield status |
 
 ---
 
-## 🧠 Notification & Routing Flow
+## 📲 Installation Guide (Android)
 
-```mermaid
-flowchart TD
-    A[Notification Triggered / Tapped] --> B{Payload Type}
-    B -->|early_reminder_id| C[Early Pre-Alert]
-    C --> D[Route to HomeScreen & Open Bento Editor Sheet]
-    B -->|reminder_id| E[Main Reminder Trigger]
-    E --> F[Fetch Fresh State from SQLite]
-    F --> G{alert_severity == strong_fullscreen?}
-    G -->|Yes| H[Launch Editorial AlarmRingingScreen]
-    G -->|No: light / short| D
-    H --> I[Interactive Checklist / Snooze +10m / Dismiss]
+1. **Download APK**: Grab [`ilmi-Task-v1.0.0.apk`](release/ilmi-Task-v1.0.0.apk) from the `release/` directory.
+2. **Install**:
+   - Open the downloaded APK on your Android device.
+   - If Google Play Protect warns about an untrusted developer, tap **More details** $\rightarrow$ **Install anyway**.
+3. **Activate Reliability Shield**:
+   - Open **ilmi Task**.
+   - Tap the **Shield** icon in the top header.
+   - Tap **"Enable Reliable Background Alarms"** to whitelist ilmi Task from battery optimizations so alarms trigger reliably on time, even when the screen is locked and Android enters Doze mode.
+   - Ensure Location permissions are set to "Allow all the time" if using Geofence arrival/departure alerts.
+
+---
+
+## 🧪 Automated Test Verification
+
+All unit, repository, and widget tests run deterministically with zero mocked network dependencies:
+
+```powershell
+# Analyze codebase
+flutter analyze
+# Output: No issues found!
+
+# Run full test suite
+flutter test
+# Output: 00:03 +22: All tests passed!
+```
+
+---
+
+<p align="center">
+  Crafted with precision by <b>Racc Lab</b>
+</p>
