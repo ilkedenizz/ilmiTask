@@ -6,6 +6,8 @@ import '../data/models/category_model.dart';
 import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
+import '../theme/app_colors.dart';
+import '../widgets/location_picker_sheet.dart';
 
 class ReminderEditorSheet extends StatefulWidget {
   final Reminder? reminder;
@@ -55,6 +57,11 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
   String _alertSeverity = ReminderAlertSeverity.short;
   bool _isPinned = false;
   String? _imagePath;
+  bool _enableLocation = false;
+  double? _locationLat;
+  double? _locationLng;
+  double _locationRadius = 250.0;
+  String _locationTriggerType = LocationTriggerType.arrive;
 
   // Checklist items
   final List<Subtask> _subtasks = [];
@@ -77,6 +84,12 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
       _isPinned = r.isPinned;
       _imagePath = r.imagePath;
       _subtasks.addAll(r.subtasks);
+      _locationLat = r.locationLat;
+      _locationLng = r.locationLng;
+      _locationRadius = r.locationRadius ?? 250.0;
+      _locationTriggerType =
+          r.locationTriggerType ?? LocationTriggerType.arrive;
+      _enableLocation = r.locationLat != null && r.locationLng != null;
     }
   }
 
@@ -226,6 +239,10 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
       earlyAlertMinutes: _earlyAlertMinutes,
       repeatRule: _repeatRule,
       alertSeverity: _alertSeverity,
+      locationLat: _enableLocation ? (_locationLat ?? 39.9334) : null,
+      locationLng: _enableLocation ? (_locationLng ?? 32.8597) : null,
+      locationRadius: _enableLocation ? _locationRadius : null,
+      locationTriggerType: _enableLocation ? _locationTriggerType : null,
       imagePath: _imagePath,
       isPinned: _isPinned,
       isCompleted: widget.reminder?.isCompleted ?? false,
@@ -753,6 +770,328 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           ),
                         ],
                       ),
+                    const SizedBox(height: 24),
+
+                    // LOCATION TRIGGER (GEOFENCING) SECTION
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 18,
+                                color: AppColors.accent,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Location Trigger (Geofencing)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const Spacer(),
+                              Switch(
+                                value: _enableLocation,
+                                activeThumbColor: AppColors.accent,
+                                activeTrackColor:
+                                    AppColors.accent.withValues(alpha: 0.3),
+                                inactiveThumbColor: AppColors.textMuted,
+                                inactiveTrackColor:
+                                    AppColors.surfaceInteractive,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _enableLocation = val;
+                                    if (val && _locationLat == null) {
+                                      _locationLat = 39.9334;
+                                      _locationLng = 32.8597;
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          if (_enableLocation) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                              'TRIGGER TYPE',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textMuted,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: const Center(
+                                      child: Text('ARRIVING'),
+                                    ),
+                                    labelStyle: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: _locationTriggerType ==
+                                              LocationTriggerType.arrive
+                                          ? AppColors.canvas
+                                          : AppColors.textSecondary,
+                                    ),
+                                    selected: _locationTriggerType ==
+                                        LocationTriggerType.arrive,
+                                    selectedColor: AppColors.accent,
+                                    backgroundColor:
+                                        AppColors.surfaceInteractive,
+                                    side: BorderSide(
+                                      color: _locationTriggerType ==
+                                              LocationTriggerType.arrive
+                                          ? AppColors.accent
+                                          : AppColors.cardBorder,
+                                    ),
+                                    onSelected: (val) {
+                                      if (val) {
+                                        setState(() {
+                                          _locationTriggerType =
+                                              LocationTriggerType.arrive;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: const Center(
+                                      child: Text('LEAVING'),
+                                    ),
+                                    labelStyle: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: _locationTriggerType ==
+                                              LocationTriggerType.leave
+                                          ? AppColors.canvas
+                                          : AppColors.textSecondary,
+                                    ),
+                                    selected: _locationTriggerType ==
+                                        LocationTriggerType.leave,
+                                    selectedColor: AppColors.accent,
+                                    backgroundColor:
+                                        AppColors.surfaceInteractive,
+                                    side: BorderSide(
+                                      color: _locationTriggerType ==
+                                              LocationTriggerType.leave
+                                          ? AppColors.accent
+                                          : AppColors.cardBorder,
+                                    ),
+                                    onSelected: (val) {
+                                      if (val) {
+                                        setState(() {
+                                          _locationTriggerType =
+                                              LocationTriggerType.leave;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'GEOFENCE RADIUS',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textMuted,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                for (final r in [100.0, 250.0, 500.0, 1000.0])
+                                  ChoiceChip(
+                                    label: Text('${r.toInt()}m'),
+                                    labelStyle: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _locationRadius == r
+                                          ? AppColors.canvas
+                                          : AppColors.textSecondary,
+                                    ),
+                                    selected: _locationRadius == r,
+                                    selectedColor: AppColors.accent,
+                                    backgroundColor:
+                                        AppColors.surfaceInteractive,
+                                    side: BorderSide(
+                                      color: _locationRadius == r
+                                          ? AppColors.accent
+                                          : AppColors.cardBorder,
+                                    ),
+                                    onSelected: (val) {
+                                      if (val) {
+                                        setState(() => _locationRadius = r);
+                                      }
+                                    },
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'COORDINATES',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textMuted,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                                Text(
+                                  '${(_locationLat ?? 39.9334).toStringAsFixed(4)}, ${(_locationLng ?? 32.8597).toStringAsFixed(4)}',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                ActionChip(
+                                  label: const Text('Center'),
+                                  labelStyle: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  backgroundColor:
+                                      AppColors.surfaceInteractive,
+                                  side: const BorderSide(
+                                    color: AppColors.cardBorder,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _locationLat = 39.9334;
+                                      _locationLng = 32.8597;
+                                    });
+                                  },
+                                ),
+                                ActionChip(
+                                  label: const Text('Home'),
+                                  labelStyle: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  backgroundColor:
+                                      AppColors.surfaceInteractive,
+                                  side: const BorderSide(
+                                    color: AppColors.cardBorder,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _locationLat = 39.9208;
+                                      _locationLng = 32.8541;
+                                    });
+                                  },
+                                ),
+                                ActionChip(
+                                  label: const Text('Office'),
+                                  labelStyle: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  backgroundColor:
+                                      AppColors.surfaceInteractive,
+                                  side: const BorderSide(
+                                    color: AppColors.cardBorder,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _locationLat = 39.9080;
+                                      _locationLng = 32.7800;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.accent,
+                                  side: const BorderSide(
+                                    color: AppColors.accent,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                onPressed: () async {
+                                  final result = await showModalBottomSheet<
+                                      LocationPickerResult>(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    useSafeArea: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (ctx) => LocationPickerSheet(
+                                      initialLat: _locationLat,
+                                      initialLng: _locationLng,
+                                      initialRadius: _locationRadius,
+                                    ),
+                                  );
+
+                                  if (result != null) {
+                                    setState(() {
+                                      _locationLat = result.latitude;
+                                      _locationLng = result.longitude;
+                                      _locationRadius = result.radius;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.map_outlined, size: 16),
+                                label: const Text(
+                                  'Open Dark Map Picker',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 30),
                   ],
                 ),

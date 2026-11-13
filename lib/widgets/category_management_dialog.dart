@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/models/category_model.dart';
 import '../data/repositories/reminder_repository.dart';
+import '../theme/app_colors.dart';
 
 class CategoryManagementDialog extends StatefulWidget {
   final ReminderRepository repository;
@@ -28,14 +29,14 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
   bool _isLoading = true;
 
   final List<String> _colorPresets = [
-    '#2196F3', // Blue
-    '#4CAF50', // Green
-    '#FF9800', // Orange
-    '#F44336', // Red
-    '#9C27B0', // Purple
-    '#009688', // Teal
-    '#E91E63', // Pink
-    '#795548', // Brown
+    '#FF5500', // International Orange
+    '#3B82F6', // Blue
+    '#10B981', // Emerald
+    '#F59E0B', // Amber
+    '#EF4444', // Red
+    '#8B5CF6', // Purple
+    '#06B6D4', // Cyan
+    '#EC4899', // Pink
   ];
   late String _selectedColorHex;
 
@@ -66,7 +67,7 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
       final formatted = hex.replaceFirst('#', '');
       return Color(int.parse('FF$formatted', radix: 16));
     } catch (_) {
-      return Colors.blue;
+      return AppColors.accent;
     }
   }
 
@@ -92,14 +93,25 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return AlertDialog(
+      backgroundColor: AppColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.cardBorder),
+      ),
       title: const Row(
         children: [
-          Icon(Icons.category_outlined),
+          Icon(Icons.category_outlined, color: AppColors.accent, size: 20),
           SizedBox(width: 8),
-          Text('Manage Categories'),
+          Text(
+            'Manage Categories',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -109,11 +121,13 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Create new category form
-              Text(
+              const Text(
                 'Add Category',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMuted,
+                  letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 8),
@@ -122,11 +136,38 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                   Expanded(
                     child: TextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
                         hintText: 'Category name',
+                        hintStyle: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 13,
+                        ),
                         isDense: true,
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
+                        filled: true,
+                        fillColor: AppColors.surfaceInteractive,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: AppColors.cardBorder,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: AppColors.cardBorder,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: AppColors.accent,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 10,
                         ),
@@ -134,15 +175,22 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.filled(
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     onPressed: _addCategory,
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(Icons.add, size: 20),
                     tooltip: 'Save Category',
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Color preset picker
+              const SizedBox(height: 12),
+              // Minimal color preset selector
               Wrap(
                 spacing: 8,
                 runSpacing: 6,
@@ -152,22 +200,22 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                   return GestureDetector(
                     onTap: () => setState(() => _selectedColorHex = hex),
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         color: color,
                         shape: BoxShape.circle,
                         border: isSelected
                             ? Border.all(
-                                color: theme.colorScheme.onSurface,
-                                width: 2.5,
+                                color: Colors.white,
+                                width: 2,
                               )
                             : null,
                       ),
                       child: isSelected
                           ? const Icon(
                               Icons.check,
-                              size: 16,
+                              size: 13,
                               color: Colors.white,
                             )
                           : null,
@@ -175,13 +223,15 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                   );
                 }).toList(),
               ),
-              const Divider(height: 28),
+              const Divider(color: AppColors.cardBorder, height: 26),
 
-              // Existing categories list
-              Text(
+              const Text(
                 'Existing Categories',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMuted,
+                  letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 8),
@@ -189,11 +239,17 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(16.0),
-                    child: CircularProgressIndicator(),
+                    child: CircularProgressIndicator(
+                      color: AppColors.accent,
+                      strokeWidth: 2,
+                    ),
                   ),
                 )
               else if (_categories.isEmpty)
-                const Text('No categories found.')
+                const Text(
+                  'No categories found.',
+                  style: TextStyle(color: AppColors.textMuted),
+                )
               else
                 ..._categories.map((cat) {
                   final catColor = _parseColor(cat.colorHex);
@@ -202,17 +258,21 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                     dense: true,
                     leading: CircleAvatar(
                       backgroundColor: catColor,
-                      radius: 8,
+                      radius: 5,
                     ),
                     title: Text(
                       cat.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     trailing: IconButton(
                       icon: const Icon(
                         Icons.delete_outline,
-                        size: 20,
-                        color: Colors.red,
+                        size: 18,
+                        color: AppColors.danger,
                       ),
                       tooltip: 'Delete',
                       onPressed: () => _deleteCategory(cat.id!),
@@ -225,6 +285,9 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
       ),
       actions: [
         TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+          ),
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Close'),
         ),

@@ -241,6 +241,32 @@ class NotificationService {
     );
   }
 
+  /// Triggers an immediate notification for location geofence arrival or departure
+  Future<void> showGeofenceNotification({
+    required Reminder reminder,
+    required String triggerType,
+  }) async {
+    if (reminder.id == null) return;
+    final details = _buildNotificationDetails(
+      alertSeverity: reminder.alertSeverity,
+      title: reminder.title,
+      body: reminder.notes ?? '',
+    );
+
+    final actionText = triggerType == 'leave' ? 'Left area' : 'Arrived at area';
+    final bodyText = (reminder.notes != null && reminder.notes!.isNotEmpty)
+        ? '$actionText • ${reminder.notes}'
+        : 'Location trigger ($actionText): ${reminder.title}';
+
+    await _notificationsPlugin.show(
+      id: reminder.id!,
+      title: '📍 ${reminder.title}',
+      body: bodyText,
+      notificationDetails: details,
+      payload: 'reminder_${reminder.id}',
+    );
+  }
+
   /// Schedules main notification and early pre-alert notification for a reminder
   Future<void> scheduleReminderNotification(Reminder reminder) async {
     if (reminder.id == null) return;

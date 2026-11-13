@@ -8,6 +8,7 @@ import 'screens/alarm_ringing_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/reminder_editor_sheet.dart';
 import 'services/notification_service.dart';
+import 'theme/app_colors.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -112,35 +113,28 @@ class SamsungReminderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primarySeed = Color(0xFF1976D2);
-
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       title: 'Samsung Reminder',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: primarySeed,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF7F9FC),
-        cardTheme: const CardThemeData(
-          color: Colors.white,
-          surfaceTintColor: Colors.transparent,
-        ),
-      ),
+      themeMode: ThemeMode.dark, // Default to bespoke matte obsidian dark mode
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: primarySeed,
-          brightness: Brightness.dark,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: AppColors.canvas,
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.accent,
+          surface: AppColors.card,
+          onSurface: AppColors.textPrimary,
+          outline: AppColors.cardBorder,
         ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        fontFamily: 'sans-serif',
         cardTheme: const CardThemeData(
-          color: Color(0xFF1E1E1E),
-          surfaceTintColor: Colors.transparent,
+          color: AppColors.card,
+          elevation: 0,
+          margin: EdgeInsets.zero,
         ),
+        dividerColor: AppColors.cardBorder,
       ),
       home: HomeScreen(repository: repository),
     );

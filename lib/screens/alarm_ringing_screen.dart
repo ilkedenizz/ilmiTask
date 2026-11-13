@@ -6,6 +6,7 @@ import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
 import '../services/notification_service.dart';
+import '../theme/app_colors.dart';
 
 class AlarmRingingScreen extends StatefulWidget {
   final int? reminderId;
@@ -54,13 +55,13 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
     super.initState();
     _repository = widget.repository ?? ReminderRepository();
 
-    // Pulse animation for alarm icon
+    // Subtle pulsing animation for status pill dot
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.15).animate(
+    _pulseAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
@@ -130,8 +131,8 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
       return;
     }
 
-    // Cancel current ringing notification sound/heads-up
-    await NotificationService.instance.cancelReminderNotification(_reminder!.id!);
+    await NotificationService.instance
+        .cancelReminderNotification(_reminder!.id!);
 
     final snoozedDue = DateTime.now().add(const Duration(minutes: 10));
     final updatedReminder = _reminder!.copyWith(
@@ -154,7 +155,6 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
 
   Future<void> _dismissAndComplete() async {
     if (_reminder != null && _reminder!.id != null) {
-      // Mark as completed in SQLite and stop notification
       await _repository.toggleReminderCompletion(_reminder!.id!, true);
     } else if (widget.reminderId != null) {
       await _repository.toggleReminderCompletion(widget.reminderId!, true);
@@ -167,247 +167,298 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final timeStr = DateFormat('HH:mm').format(_currentTime);
-    final dateStr = DateFormat('EEEE, MMMM d').format(_currentTime);
+    final timeStr = DateFormat('HH:mm:ss').format(_currentTime);
+    final dateStr = DateFormat('EEE, MMM d').format(_currentTime).toUpperCase();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1115), // Deep dark high-contrast
+      backgroundColor: AppColors.canvas,
       body: SafeArea(
         child: _isLoading
             ? const Center(
-                child: CircularProgressIndicator(color: Colors.redAccent),
+                child: CircularProgressIndicator(
+                  color: AppColors.accent,
+                  strokeWidth: 2,
+                ),
               )
             : Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 20.0,
+                ),
                 child: Column(
                   children: [
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
 
-                    // Live digital clock & date
-                    Text(
-                      timeStr,
-                      style: const TextStyle(
-                        fontSize: 64,
-                        fontWeight: FontWeight.w300,
-                        color: Colors.white,
-                        letterSpacing: -1.5,
+                    // Minimal status pill (● ALARM ACTIVE)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
                       ),
-                    ),
-                    Text(
-                      dateStr,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1416),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FadeTransition(
+                            opacity: _pulseAnimation,
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppColors.danger,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          const Text(
+                            'ALARM ACTIVE',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.danger,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Pulsing animated alarm badge
-                    ScaleTransition(
-                      scale: _pulseAnimation,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.redAccent.withValues(alpha: 0.6),
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.alarm,
-                          size: 42,
-                          color: Colors.redAccent,
-                        ),
+                    // Massive Editorial Monospace Clock
+                    Text(
+                      timeStr,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 60,
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: -2.5,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
 
-                    // Reminder Details & Interactive Checklist Container
+                    // Structured Matte Card for Task & Checklist
                     Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            // Title
-                            Text(
-                              _reminder?.title ?? 'Alarm Alert',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            if (_reminder?.notes != null &&
-                                _reminder!.notes!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 10),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                _reminder!.notes!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.white.withValues(alpha: 0.8),
+                                _reminder?.title ?? 'Alarm Alert',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
-                            ],
-
-                            // Attached Image Preview
-                            if (_reminder?.imagePath != null &&
-                                File(_reminder!.imagePath!).existsSync()) ...[
-                              const SizedBox(height: 16),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.file(
-                                  File(_reminder!.imagePath!),
-                                  width: double.infinity,
-                                  height: 170,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ],
-
-                            // Interactive Checklist Items
-                            if (_reminder != null &&
-                                _reminder!.subtasks.isNotEmpty) ...[
-                              const SizedBox(height: 18),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.15),
+                              if (_reminder?.notes != null &&
+                                  _reminder!.notes!.trim().isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  _reminder!.notes!,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                    height: 1.4,
                                   ),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.checklist,
-                                          color: Colors.white70,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'CHECKLIST (${_reminder!.subtasks.where((s) => s.isDone).length}/${_reminder!.subtasks.length})',
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.8,
-                                          ),
-                                        ),
-                                      ],
+                              ],
+
+                              // Attached Photo Preview
+                              if (_reminder?.imagePath != null &&
+                                  File(_reminder!.imagePath!).existsSync()) ...[
+                                const SizedBox(height: 14),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.file(
+                                    File(_reminder!.imagePath!),
+                                    width: double.infinity,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ],
+
+                              // Interactive Monospace Checklist Container
+                              if (_reminder != null &&
+                                  _reminder!.subtasks.isNotEmpty) ...[
+                                const SizedBox(height: 18),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.subtaskContainer,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: AppColors.cardBorder,
                                     ),
-                                    const SizedBox(height: 8),
-                                    ..._reminder!.subtasks.map((st) {
-                                      return InkWell(
-                                        borderRadius: BorderRadius.circular(8),
-                                        onTap: () => _toggleSubtask(st),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 6,
-                                            horizontal: 4,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                st.isDone
-                                                    ? Icons.check_box
-                                                    : Icons
-                                                        .check_box_outline_blank,
-                                                color: st.isDone
-                                                    ? Colors.greenAccent
-                                                    : Colors.white60,
-                                                size: 20,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  st.title,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'CHECKLIST (${_reminder!.subtasks.where((s) => s.isDone).length}/${_reminder!.subtasks.length})',
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textMuted,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ..._reminder!.subtasks.map((st) {
+                                        return InkWell(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          onTap: () => _toggleSubtask(st),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 6,
+                                              horizontal: 4,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 16,
+                                                  height: 16,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            4),
+                                                    border: Border.all(
+                                                      color: st.isDone
+                                                          ? AppColors.accent
+                                                          : AppColors
+                                                              .textMuted,
+                                                      width: 1.2,
+                                                    ),
                                                     color: st.isDone
-                                                        ? Colors.white38
-                                                        : Colors.white,
-                                                    decoration: st.isDone
-                                                        ? TextDecoration
-                                                            .lineThrough
-                                                        : null,
+                                                        ? AppColors.accent
+                                                        : Colors.transparent,
+                                                  ),
+                                                  child: st.isDone
+                                                      ? const Icon(
+                                                          Icons.check,
+                                                          size: 11,
+                                                          color: Colors.black,
+                                                        )
+                                                      : null,
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    st.title,
+                                                    style: TextStyle(
+                                                      fontSize: 13.5,
+                                                      color: st.isDone
+                                                          ? AppColors.textMuted
+                                                          : AppColors
+                                                              .textPrimary,
+                                                      decoration: st.isDone
+                                                          ? TextDecoration
+                                                              .lineThrough
+                                                          : null,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
+                                        );
+                                      }),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
 
-                    // Action Buttons (Snooze + Dismiss)
-                    const SizedBox(height: 12),
+                    // Architectural Action Buttons
+                    const SizedBox(height: 16),
                     Row(
                       children: [
-                        // Snooze Button
+                        // Snooze Outlined Slate Button
                         Expanded(
                           child: SizedBox(
-                            height: 56,
-                            child: OutlinedButton.icon(
+                            height: 52,
+                            child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(
-                                  color: Colors.white54,
-                                  width: 1.5,
+                                  color: AppColors.borderInteractive,
+                                  width: 1,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(28),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                foregroundColor: Colors.white,
+                                foregroundColor: AppColors.textSecondary,
                               ),
                               onPressed: _snoozeTenMinutes,
-                              icon: const Icon(Icons.snooze, size: 22),
-                              label: const Text(
+                              child: const Text(
                                 'Snooze (+10m)',
                                 style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.2,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
 
-                        // Dismiss & Complete Button
+                        // Dismiss Solid High-Contrast Off-White Button
                         Expanded(
                           child: SizedBox(
-                            height: 56,
-                            child: FilledButton.icon(
+                            height: 52,
+                            child: FilledButton(
                               style: FilledButton.styleFrom(
-                                backgroundColor: Colors.redAccent.shade400,
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.textPrimary,
+                                foregroundColor: AppColors.canvas,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(28),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
                               onPressed: _dismissAndComplete,
-                              icon: const Icon(Icons.check, size: 22),
-                              label: const Text(
+                              child: const Text(
                                 'Dismiss / Done',
                                 style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.2,
                                 ),
                               ),
                             ),
@@ -415,7 +466,7 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                   ],
                 ),
               ),

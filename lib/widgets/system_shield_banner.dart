@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../theme/app_colors.dart';
 
 class SystemShieldBanner extends StatefulWidget {
   final VoidCallback onOpenShieldDialog;
@@ -57,74 +58,86 @@ class _SystemShieldBannerState extends State<SystemShieldBanner> {
       return const SizedBox.shrink();
     }
 
-    final theme = Theme.of(context);
-
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.amber.shade300),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.accentAmber.withValues(alpha: 0.4),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.battery_alert,
-                color: Colors.amber.shade900,
-                size: 22,
+                color: AppColors.accentAmber,
+                size: 18,
               ),
               const SizedBox(width: 8),
-              Expanded(
+              const Expanded(
                 child: Text(
                   'Battery Optimization is Active',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.amber.shade900,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppColors.accentAmber,
                   ),
                 ),
               ),
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: Icon(Icons.close, size: 18, color: Colors.amber.shade900),
+                icon: const Icon(
+                  Icons.close,
+                  size: 16,
+                  color: AppColors.textMuted,
+                ),
                 onPressed: () => setState(() => _isDismissed = true),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            'Your device may delay alarms when in sleep mode. Allow background execution so scheduled reminders always wake your screen.',
+          const Text(
+            'Your device may delay alarms in sleep mode. Allow background execution so scheduled reminders always wake your screen.',
             style: TextStyle(
-              fontSize: 12.5,
-              color: Colors.brown.shade800,
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.35,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             children: [
-              FilledButton.tonal(
+              FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.amber.shade200,
-                  foregroundColor: Colors.brown.shade900,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  backgroundColor: AppColors.accentAmber,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: _requestOptimizationFix,
                 child: const Text(
                   'Enable Reliable Background Alarms',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               TextButton(
                 onPressed: widget.onOpenShieldDialog,
                 style: TextButton.styleFrom(
-                  foregroundColor: theme.colorScheme.primary,
+                  foregroundColor: AppColors.textSecondary,
                   visualDensity: VisualDensity.compact,
                 ),
                 child: const Text('Details'),

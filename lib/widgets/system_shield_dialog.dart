@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../data/models/reminder_model.dart';
 import '../screens/alarm_ringing_screen.dart';
+import '../theme/app_colors.dart';
 
 class SystemShieldDialog extends StatefulWidget {
   const SystemShieldDialog({super.key});
@@ -23,6 +24,7 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
   PermissionStatus _notificationStatus = PermissionStatus.denied;
   PermissionStatus _exactAlarmStatus = PermissionStatus.denied;
   PermissionStatus _batteryOptStatus = PermissionStatus.denied;
+  PermissionStatus _locationStatus = PermissionStatus.denied;
   bool _isLoading = true;
 
   @override
@@ -39,6 +41,7 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
         _notificationStatus = PermissionStatus.granted;
         _exactAlarmStatus = PermissionStatus.granted;
         _batteryOptStatus = PermissionStatus.granted;
+        _locationStatus = PermissionStatus.granted;
         _isLoading = false;
       });
       return;
@@ -47,11 +50,13 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
     final notif = await Permission.notification.status;
     final alarm = await Permission.scheduleExactAlarm.status;
     final battery = await Permission.ignoreBatteryOptimizations.status;
+    final location = await Permission.location.status;
 
     setState(() {
       _notificationStatus = notif;
       _exactAlarmStatus = alarm;
       _batteryOptStatus = battery;
+      _locationStatus = location;
       _isLoading = false;
     });
   }
@@ -67,6 +72,9 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
       if (!_batteryOptStatus.isGranted) {
         await Permission.ignoreBatteryOptimizations.request();
       }
+      if (!_locationStatus.isGranted) {
+        await Permission.location.request();
+      }
     }
     await _checkPermissions();
   }
@@ -78,14 +86,25 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return AlertDialog(
+      backgroundColor: AppColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.cardBorder),
+      ),
       title: const Row(
         children: [
-          Icon(Icons.shield_outlined, color: Colors.blue),
+          Icon(Icons.shield_outlined, color: AppColors.accent, size: 20),
           SizedBox(width: 10),
-          Text('System Reliability Shield'),
+          Text(
+            'System Reliability Shield',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -94,22 +113,27 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
             ? const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24.0),
-                  child: CircularProgressIndicator(),
+                  child: CircularProgressIndicator(
+                    color: AppColors.accent,
+                    strokeWidth: 2,
+                  ),
                 ),
               )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'To ensure your reminders trigger on time even when the device is locked, asleep, or in Doze mode, ensure all system permissions are granted.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                  const Text(
+                    'To ensure your reminders trigger to the second even under Android Doze mode and locked screens, grant the required background execution shields.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  // Notifications status item
                   _buildStatusTile(
                     title: 'System Notifications',
                     subtitle: 'Allows showing alerts and banners',
@@ -119,9 +143,8 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
                       await _checkPermissions();
                     },
                   ),
-                  const Divider(height: 16),
+                  const Divider(color: AppColors.cardBorder, height: 16),
 
-                  // Exact Alarms status item
                   _buildStatusTile(
                     title: 'Exact Alarm Scheduling',
                     subtitle: 'Required for to-the-second precision',
@@ -131,9 +154,8 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
                       await _checkPermissions();
                     },
                   ),
-                  const Divider(height: 16),
+                  const Divider(color: AppColors.cardBorder, height: 16),
 
-                  // Battery Optimization Shield item
                   _buildStatusTile(
                     title: 'Battery Optimization Shield',
                     subtitle: 'Prevents Android OS from killing alarms',
@@ -143,22 +165,39 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
                       await _checkPermissions();
                     },
                   ),
+                  const Divider(color: AppColors.cardBorder, height: 16),
+
+                  _buildStatusTile(
+                    title: 'Location Triggers (Geofencing)',
+                    subtitle: 'Required for arrival and departure alerts',
+                    isGranted: _locationStatus.isGranted,
+                    onTapRequest: () async {
+                      await Permission.location.request();
+                      await _checkPermissions();
+                    },
+                  ),
                   const SizedBox(height: 20),
 
-                  // Big Action Button
                   if (!_allReliable)
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onPressed: _requestAllReliabilityPermissions,
-                        icon: const Icon(Icons.bolt),
+                        icon: const Icon(Icons.bolt, size: 18),
                         label: const Text(
                           'Enable Reliable Background Alarms',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                       ),
                     )
@@ -166,23 +205,27 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.12),
+                        color: AppColors.success.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.green.withValues(alpha: 0.4),
+                          color: AppColors.success.withValues(alpha: 0.3),
                         ),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.check_circle, color: Colors.green),
+                          Icon(
+                            Icons.check_circle,
+                            color: AppColors.success,
+                            size: 18,
+                          ),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'All system shields active. Background reminders are 100% reliable.',
                               style: TextStyle(
-                                color: Colors.green,
+                                color: AppColors.success,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                                fontSize: 12.5,
                               ),
                             ),
                           ),
@@ -191,9 +234,17 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
                     ),
                 ],
               ),
+            ),
       ),
       actions: [
         OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+            side: const BorderSide(color: AppColors.cardBorder),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
           onPressed: () {
             Navigator.of(context).pop();
             Navigator.of(context).push(
@@ -208,10 +259,16 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
               ),
             );
           },
-          icon: const Icon(Icons.alarm, size: 16),
-          label: const Text('Test Alarm Screen'),
+          icon: const Icon(Icons.alarm, size: 14),
+          label: const Text(
+            'Test Alarm Screen',
+            style: TextStyle(fontSize: 12),
+          ),
         ),
         TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+          ),
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Close'),
         ),
@@ -229,10 +286,10 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
       children: [
         Icon(
           isGranted ? Icons.check_circle : Icons.warning_amber_rounded,
-          color: isGranted ? Colors.green : Colors.amber.shade800,
-          size: 24,
+          color: isGranted ? AppColors.success : AppColors.warning,
+          size: 20,
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,15 +297,16 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
                 ),
               ),
               Text(
                 subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
                 ),
               ),
             ],
@@ -256,6 +314,10 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
         ),
         if (!isGranted)
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accent,
+              visualDensity: VisualDensity.compact,
+            ),
             onPressed: onTapRequest,
             child: const Text('Grant'),
           ),
