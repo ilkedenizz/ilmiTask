@@ -50,6 +50,12 @@
 - **Deterministic Geofence Monitoring**: State-tracked arrival and departure evaluation (`arrive`: outside $\rightarrow$ inside; `leave`: inside $\rightarrow$ outside) using `Geolocator.distanceBetween()`.
 - **Smart URL Link Extractor**: Regex detection in notes automatically surfaces a sleek `[ ↗ OPEN LINK ]` chip that opens web pages via `url_launcher`.
 
+### Phase 6: Turkish Localization, Actionable Notifications, Native Widget & Agenda View
+- **Full Turkish Localization (TR / EN)**: Native Turkish UI strings across all screens (`AppStrings`), with a quick-switch toggle in the top bar. Automatic fallback to English during automated widget tests.
+- **Actionable Notification Buttons**: Direct notification shade buttons `[ ✓ Tamamla ]` (marks reminder done in SQLite) and `[ 🕒 Ertele (+10dk) ]` (atomically reschedules alarm +10 min) without opening the app.
+- **Obsidian Android Home Screen Widget**: Bespoke 4x2 / 2x2 native app widget displaying real-time task counts for today, top agenda items, and a quick-add `+` shortcut that launches directly into task creation.
+- **Calendar & Agenda View (Takvim / Ajanda)**: Dedicated view toggle (`[ LİSTE ]` / `[ AJANDA ]`) featuring a dark monthly calendar grid, reminder date dots, and a day-by-day agenda list.
+
 ---
 
 ## 🧭 Notification & Intent Routing Architecture
