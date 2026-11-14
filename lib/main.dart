@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'data/database_helper.dart';
 import 'data/models/reminder_model.dart';
@@ -13,6 +14,22 @@ import 'services/notification_service.dart';
 import 'theme/app_colors.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse response) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    try {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    } catch (_) {}
+  }
+  final actionId = response.actionId;
+  final payload = response.payload;
+  if (actionId != null && actionId.isNotEmpty && payload != null) {
+    await handleNotificationAction(actionId, payload);
+  }
+}
 
 Future<void> handleNotificationAction(
   String actionId,
@@ -171,6 +188,7 @@ void main() async {
           handleNotificationPayload(payload);
         }
       },
+      onBackgroundNotificationResponse: notificationTapBackground,
     );
   } catch (e, stack) {
     debugPrint('Notification service initialization error on cold start: $e\n$stack');

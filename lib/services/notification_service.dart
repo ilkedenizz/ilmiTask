@@ -51,6 +51,7 @@ class NotificationService {
   /// Initializes the local notification plugin, creates channels, and sets up timezones
   Future<void> initialize({
     void Function(NotificationResponse)? onNotificationResponse,
+    void Function(NotificationResponse)? onBackgroundNotificationResponse,
   }) async {
     if (_isInitialized) return;
 
@@ -78,6 +79,8 @@ class NotificationService {
       await _notificationsPlugin.initialize(
         settings: initSettings,
         onDidReceiveNotificationResponse: onNotificationResponse,
+        onDidReceiveBackgroundNotificationResponse:
+            onBackgroundNotificationResponse,
       );
     } catch (e) {
       debugPrint('Warning: Notification plugin primary init failed: $e');
@@ -91,6 +94,8 @@ class NotificationService {
         await _notificationsPlugin.initialize(
           settings: fallbackSettings,
           onDidReceiveNotificationResponse: onNotificationResponse,
+          onDidReceiveBackgroundNotificationResponse:
+              onBackgroundNotificationResponse,
         );
       } catch (fallbackError) {
         debugPrint('Warning: Notification plugin fallback init failed: $fallbackError');

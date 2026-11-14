@@ -445,48 +445,49 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.card,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.cardBorder),
-                      ),
-                      child: Text(
-                        strings.isTr ? 'TR' : 'EN',
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
+                        border: Border.all(
+                          color: strings.isTr
+                              ? AppColors.accent.withValues(alpha: 0.6)
+                              : AppColors.cardBorder,
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-
-                  // View Mode Toggle (List vs Calendar)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        _viewMode == HomeViewMode.list
-                            ? Icons.calendar_month_outlined
-                            : Icons.view_agenda_outlined,
-                        size: 19,
-                        color: _viewMode == HomeViewMode.calendar
-                            ? AppColors.accent
-                            : AppColors.textSecondary,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'TR',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: strings.isTr
+                                  ? AppColors.accent
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 2.5),
+                            child: Text(
+                              '/',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'EN',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: !strings.isTr
+                                  ? AppColors.accent
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
-                      tooltip: _viewMode == HomeViewMode.list
-                          ? strings.viewCalendar
-                          : strings.viewList,
-                      onPressed: () {
-                        setState(() {
-                          _viewMode = _viewMode == HomeViewMode.list
-                              ? HomeViewMode.calendar
-                              : HomeViewMode.list;
-                        });
-                      },
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -535,6 +536,120 @@ class _HomeScreenState extends State<HomeScreen> {
             SystemShieldBanner(
               onOpenShieldDialog: () => SystemShieldDialog.show(context),
             ),
+
+            // Prominent View Mode Switcher: [ LİSTE ] | [ AJANDA ]
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () =>
+                            setState(() => _viewMode = HomeViewMode.list),
+                        borderRadius: BorderRadius.circular(8),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          decoration: BoxDecoration(
+                            color: _viewMode == HomeViewMode.list
+                                ? AppColors.surfaceInteractive
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _viewMode == HomeViewMode.list
+                                  ? AppColors.borderInteractive
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.format_list_bulleted,
+                                size: 14,
+                                color: _viewMode == HomeViewMode.list
+                                    ? AppColors.accent
+                                    : AppColors.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                strings.viewList,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                  color: _viewMode == HomeViewMode.list
+                                      ? AppColors.textPrimary
+                                      : AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () =>
+                            setState(() => _viewMode = HomeViewMode.calendar),
+                        borderRadius: BorderRadius.circular(8),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          decoration: BoxDecoration(
+                            color: _viewMode == HomeViewMode.calendar
+                                ? AppColors.surfaceInteractive
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _viewMode == HomeViewMode.calendar
+                                  ? AppColors.borderInteractive
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.calendar_month_outlined,
+                                size: 14,
+                                color: _viewMode == HomeViewMode.calendar
+                                    ? AppColors.accent
+                                    : AppColors.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                strings.viewCalendar,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                  color: _viewMode == HomeViewMode.calendar
+                                      ? AppColors.textPrimary
+                                      : AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
 
             // Conditional View Rendering: List Mode vs Calendar/Agenda Mode
             if (_viewMode == HomeViewMode.calendar)
