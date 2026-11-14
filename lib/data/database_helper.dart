@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -43,32 +44,56 @@ class DatabaseHelper {
   // Singleton instance
   static final DatabaseHelper instance = DatabaseHelper._internal();
   static Database? _database;
+  static Future<Database>? _initDbFuture;
 
   DatabaseHelper._internal();
 
   /// Setter for testing purposes (allows injecting mock/in-memory DB)
   void setDatabaseForTesting(Database? db) {
     _database = db;
+    _initDbFuture = db != null ? Future.value(db) : null;
   }
 
   Future<Database> get database async {
     if (_database != null && _database!.isOpen) {
       return _database!;
     }
-    _database = await _initDatabase();
+    _initDbFuture ??= _initDatabaseSafe();
+    _database = await _initDbFuture!;
     return _database!;
   }
 
-  Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, _databaseName);
+  Future<Database> _initDatabaseSafe() async {
+    try {
+      final dbPath = await getDatabasesPath();
+      final path = p.join(dbPath, _databaseName);
 
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onConfigure: _onConfigure,
-      onCreate: _onCreate,
-    );
+      return await openDatabase(
+        path,
+        version: _databaseVersion,
+        onConfigure: _onConfigure,
+        onCreate: _onCreate,
+      );
+    } catch (e, stack) {
+      debugPrint('DatabaseHelper openDatabase error: $e\n$stack');
+      _initDbFuture = null;
+      try {
+        final dbPath = await getDatabasesPath();
+        final path = p.join(dbPath, _databaseName);
+        await deleteDatabase(path);
+        final freshDb = await openDatabase(
+          path,
+          version: _databaseVersion,
+          onConfigure: _onConfigure,
+          onCreate: _onCreate,
+        );
+        _database = freshDb;
+        return freshDb;
+      } catch (fallbackError) {
+        debugPrint('DatabaseHelper recovery error: $fallbackError');
+        rethrow;
+      }
+    }
   }
 
   Future<void> _onConfigure(Database db) async {
@@ -164,6 +189,7 @@ class DatabaseHelper {
     if (db != null && db.isOpen) {
       await db.close();
       _database = null;
+      _initDbFuture = null;
     }
   }
 }

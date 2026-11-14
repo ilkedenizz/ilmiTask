@@ -54,14 +54,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final categories = await _repository.getAllCategories();
-    final reminders = await _repository.getAllReminders();
+    try {
+      final categories = await _repository.getAllCategories();
+      final reminders = await _repository.getAllReminders();
 
-    setState(() {
-      _categories = categories;
-      _allReminders = reminders;
-      _isLoading = false;
-    });
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _allReminders = reminders;
+          _isLoading = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('HomeScreen _loadData error: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _categories = [];
+          _allReminders = [];
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Color _parseColor(String? hex) {

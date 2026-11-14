@@ -52,7 +52,7 @@ class NotificationService {
     _setupTimeZone();
 
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/launcher_icon');
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -69,35 +69,66 @@ class NotificationService {
       linux: linuxSettings,
     );
 
-    await _notificationsPlugin.initialize(
-      settings: initSettings,
-      onDidReceiveNotificationResponse: onNotificationResponse,
-    );
+    try {
+      await _notificationsPlugin.initialize(
+        settings: initSettings,
+        onDidReceiveNotificationResponse: onNotificationResponse,
+      );
+    } catch (e) {
+      debugPrint('Warning: Notification plugin primary init failed: $e');
+      try {
+        const fallbackSettings = InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: darwinSettings,
+          macOS: darwinSettings,
+          linux: linuxSettings,
+        );
+        await _notificationsPlugin.initialize(
+          settings: fallbackSettings,
+          onDidReceiveNotificationResponse: onNotificationResponse,
+        );
+      } catch (fallbackError) {
+        debugPrint('Warning: Notification plugin fallback init failed: $fallbackError');
+      }
+    }
 
-    await _createNotificationChannels();
+    try {
+      await _createNotificationChannels();
+    } catch (e) {
+      debugPrint('Warning: Notification channel creation failed: $e');
+    }
+
     _isInitialized = true;
   }
 
   void _setupTimeZone() {
-    tz.initializeTimeZones();
+    try {
+      tz.initializeTimeZones();
+    } catch (e) {
+      debugPrint('Warning: Timezone initialization error: $e');
+    }
+
     try {
       final String timeZoneName = DateTime.now().timeZoneName;
       if (tz.timeZoneDatabase.locations.containsKey(timeZoneName)) {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
         return;
       }
-      // Match by timezone offset (e.g. standard GMT/UTC offsets)
-      final currentOffset = DateTime.now().timeZoneOffset;
+      // Match by timezone offset (milliseconds)
+      final currentOffset = DateTime.now().timeZoneOffset.inMilliseconds;
       for (final location in tz.timeZoneDatabase.locations.values) {
         if (location.currentTimeZone.offset == currentOffset) {
           tz.setLocalLocation(location);
           return;
         }
       }
-    } catch (_) {
-      // Fallback
+    } catch (e) {
+      debugPrint('Warning: Local timezone resolution error: $e');
     }
-    tz.setLocalLocation(tz.UTC);
+
+    try {
+      tz.setLocalLocation(tz.UTC);
+    } catch (_) {}
   }
 
   Future<void> _createNotificationChannels() async {

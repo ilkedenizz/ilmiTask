@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'data/database_helper.dart';
 import 'data/models/reminder_model.dart';
 import 'data/repositories/reminder_repository.dart';
 import 'screens/alarm_ringing_screen.dart';
@@ -69,25 +70,78 @@ Future<void> handleNotificationPayload(
 }
 
 void main() async {
+  // 1. Ensure Flutter bindings are initialized first
   WidgetsFlutterBinding.ensureInitialized();
 
-  // If running on desktop platforms (Windows/Linux/macOS vm), initialize ffi factory
+  // Custom global error widget to avoid blank white screens on unhandled widget build errors
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: AppColors.canvas,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.accent, size: 40),
+              const SizedBox(height: 12),
+              const Text(
+                'Temporary Interface Error',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                details.exceptionAsString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
+  // 2. Desktop FFI initialization
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    try {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    } catch (e) {
+      debugPrint('sqfliteFfiInit error: $e');
+    }
   }
 
-  // Initialize notification channels and timezone with refined response routing
-  await NotificationService.instance.initialize(
-    onNotificationResponse: (response) {
-      final payload = response.payload;
-      if (payload != null) {
-        handleNotificationPayload(payload);
-      }
-    },
-  );
+  // 3. Pre-initialize and warm up SQLite database safely
+  try {
+    await DatabaseHelper.instance.database;
+  } catch (e, stack) {
+    debugPrint('Database warm-up warning on cold start: $e\n$stack');
+  }
 
-  // Check if app was launched directly from an active notification
+  // 4. Initialize notification channels and timezone with safe catch
+  try {
+    await NotificationService.instance.initialize(
+      onNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null) {
+          handleNotificationPayload(payload);
+        }
+      },
+    );
+  } catch (e, stack) {
+    debugPrint('Notification service initialization error on cold start: $e\n$stack');
+  }
+
+  // 5. Check if app was launched directly from an active notification
   try {
     final launchDetails = await NotificationService.instance.plugin
         .getNotificationAppLaunchDetails();
@@ -99,8 +153,8 @@ void main() async {
         });
       }
     }
-  } catch (_) {
-    // Ignored in non-supported testing environments
+  } catch (e) {
+    debugPrint('Launch details check warning: $e');
   }
 
   runApp(const SamsungReminderApp());
