@@ -13,7 +13,7 @@ import '../widgets/system_shield_banner.dart';
 import '../widgets/system_shield_dialog.dart';
 import 'reminder_editor_sheet.dart';
 
-enum FilterType { all, pinned, completed, category }
+enum FilterType { all, today, scheduled, pinned, location, completed, category }
 
 class HomeScreen extends StatefulWidget {
   final ReminderRepository? repository;
@@ -87,17 +87,71 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  DateTime get _startOfToday {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime get _endOfToday {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+  }
+
+  bool _isToday(DateTime? dt) {
+    if (dt == null) return false;
+    return dt.isAfter(_startOfToday.subtract(const Duration(milliseconds: 1))) &&
+        dt.isBefore(_endOfToday.add(const Duration(milliseconds: 1)));
+  }
+
+  // Dashboard Counts for Summary Cards
+  int get _todayCount => _allReminders
+      .where((r) => !r.isCompleted && _isToday(r.dueDatetime))
+      .length;
+
+  int get _scheduledCount => _allReminders
+      .where((r) => !r.isCompleted && r.dueDatetime != null)
+      .length;
+
+  int get _pinnedCount =>
+      _allReminders.where((r) => !r.isCompleted && r.isPinned).length;
+
+  int get _locationCount => _allReminders
+      .where((r) =>
+          !r.isCompleted && r.locationLat != null && r.locationLng != null)
+      .length;
+
+  int get _completedCount =>
+      _allReminders.where((r) => r.isCompleted).length;
+
   // Filter & Search Logic
   List<Reminder> get _filteredReminders {
     var list = _allReminders;
 
-    // Apply main filter
+    // Apply active filter
     switch (_activeFilter) {
       case FilterType.all:
         list = list.where((r) => !r.isCompleted).toList();
         break;
+      case FilterType.today:
+        list = list
+            .where((r) => !r.isCompleted && _isToday(r.dueDatetime))
+            .toList();
+        break;
+      case FilterType.scheduled:
+        list = list
+            .where((r) => !r.isCompleted && r.dueDatetime != null)
+            .toList();
+        break;
       case FilterType.pinned:
         list = list.where((r) => r.isPinned && !r.isCompleted).toList();
+        break;
+      case FilterType.location:
+        list = list
+            .where((r) =>
+                !r.isCompleted &&
+                r.locationLat != null &&
+                r.locationLng != null)
+            .toList();
         break;
       case FilterType.completed:
         list = list.where((r) => r.isCompleted).toList();
@@ -127,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return list;
   }
 
+  // Section Partitioning
   List<Reminder> get _pinnedList {
     if (_activeFilter == FilterType.completed) return [];
     final pinned = _filteredReminders.where((r) => r.isPinned).toList();
@@ -134,14 +189,46 @@ class _HomeScreenState extends State<HomeScreen> {
     return pinned;
   }
 
-  List<Reminder> get _unpinnedList {
+  List<Reminder> get _overdueList {
     if (_activeFilter == FilterType.completed ||
         _activeFilter == FilterType.pinned) {
-      return _filteredReminders;
+      return [];
     }
-    final unpinned = _filteredReminders.where((r) => !r.isPinned).toList();
-    _sortRemindersByDueDate(unpinned);
-    return unpinned;
+    final now = DateTime.now();
+    final list = _filteredReminders
+        .where((r) =>
+            !r.isPinned && r.dueDatetime != null && r.dueDatetime!.isBefore(now))
+        .toList();
+    _sortRemindersByDueDate(list);
+    return list;
+  }
+
+  List<Reminder> get _upcomingList {
+    if (_activeFilter == FilterType.completed ||
+        _activeFilter == FilterType.pinned) {
+      return [];
+    }
+    final now = DateTime.now();
+    final list = _filteredReminders
+        .where((r) =>
+            !r.isPinned &&
+            r.dueDatetime != null &&
+            !r.dueDatetime!.isBefore(now))
+        .toList();
+    _sortRemindersByDueDate(list);
+    return list;
+  }
+
+  List<Reminder> get _somedayList {
+    if (_activeFilter == FilterType.completed ||
+        _activeFilter == FilterType.pinned) {
+      return [];
+    }
+    final list = _filteredReminders
+        .where((r) => !r.isPinned && r.dueDatetime == null)
+        .toList();
+    _sortRemindersByDueDate(list);
+    return list;
   }
 
   void _sortRemindersByDueDate(List<Reminder> list) {
@@ -152,6 +239,17 @@ class _HomeScreenState extends State<HomeScreen> {
       if (a.dueDatetime == null) return 1;
       if (b.dueDatetime == null) return -1;
       return a.dueDatetime!.compareTo(b.dueDatetime!);
+    });
+  }
+
+  void _toggleFilter(FilterType type) {
+    setState(() {
+      if (_activeFilter == type) {
+        _activeFilter = FilterType.all;
+      } else {
+        _activeFilter = type;
+      }
+      _selectedCategoryId = null;
     });
   }
 
@@ -226,7 +324,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final pinned = _pinnedList;
-    final unpinned = _unpinnedList;
+    final overdue = _overdueList;
+    final upcoming = _upcomingList;
+    final someday = _somedayList;
     final totalCount = _filteredReminders.length;
 
     return Scaffold(
@@ -236,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Top Bar: Search Input & Category Management Button
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
                   Expanded(
@@ -338,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Minimalist Category & Filter Bar
             SizedBox(
-              height: 40,
+              height: 38,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -394,7 +494,82 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+
+            // Top Summary Cards Grid (Samsung Reminder Dashboard Touch)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Column(
+                children: [
+                  // Row 1: Today & Scheduled
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSummaryCard(
+                          label: 'TODAY',
+                          count: _todayCount,
+                          icon: Icons.calendar_today_outlined,
+                          accentColor: AppColors.accent,
+                          isSelected: _activeFilter == FilterType.today,
+                          onTap: () => _toggleFilter(FilterType.today),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryCard(
+                          label: 'SCHEDULED',
+                          count: _scheduledCount,
+                          icon: Icons.event_outlined,
+                          accentColor: const Color(0xFF38BDF8),
+                          isSelected: _activeFilter == FilterType.scheduled,
+                          onTap: () => _toggleFilter(FilterType.scheduled),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Row 2: Important, Location, Done
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSummaryCard(
+                          label: 'IMPORTANT',
+                          count: _pinnedCount,
+                          icon: Icons.push_pin_outlined,
+                          accentColor: AppColors.accentAmber,
+                          isSelected: _activeFilter == FilterType.pinned,
+                          onTap: () => _toggleFilter(FilterType.pinned),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryCard(
+                          label: 'LOCATION',
+                          count: _locationCount,
+                          icon: Icons.location_on_outlined,
+                          accentColor: const Color(0xFFA78BFA),
+                          isSelected: _activeFilter == FilterType.location,
+                          onTap: () => _toggleFilter(FilterType.location),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryCard(
+                          label: 'DONE',
+                          count: _completedCount,
+                          icon: Icons.check_circle_outline,
+                          accentColor: AppColors.success,
+                          isSelected: _activeFilter == FilterType.completed,
+                          onTap: () => _toggleFilter(FilterType.completed),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
 
             // Reminders List Body
             Expanded(
@@ -412,77 +587,116 @@ class _HomeScreenState extends State<HomeScreen> {
                           backgroundColor: AppColors.card,
                           onRefresh: _loadData,
                           child: ListView(
-                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 80),
+                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 88),
                             children: [
-                              // Pinned Section
-                              if (pinned.isNotEmpty &&
-                                  _activeFilter != FilterType.pinned) ...[
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.push_pin,
-                                        size: 13,
-                                        color: AppColors.accent,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'PINNED (${pinned.length})',
-                                        style: const TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.accent,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ],
+                              // Completed Mode View
+                              if (_activeFilter == FilterType.completed) ...[
+                                _buildSectionHeader(
+                                  'COMPLETED',
+                                  _filteredReminders.length,
+                                  icon: Icons.check_circle_outline,
+                                  color: AppColors.success,
+                                ),
+                                ..._filteredReminders.map(
+                                  (r) => ReminderCard(
+                                    key: ValueKey('comp_${r.id}'),
+                                    reminder: r,
+                                    onToggleComplete: (val) =>
+                                        _toggleComplete(r, val),
+                                    onTogglePin: () => _togglePin(r),
+                                    onDelete: () =>
+                                        _deleteReminderWithUndo(r),
+                                    onTap: () => _openEditor(r),
+                                    onToggleSubtask: _toggleSubtask,
                                   ),
                                 ),
-                                ...pinned.map((r) => ReminderCard(
-                                      key: ValueKey('pinned_${r.id}'),
-                                      reminder: r,
-                                      onToggleComplete: (val) =>
-                                          _toggleComplete(r, val),
-                                      onTogglePin: () => _togglePin(r),
-                                      onDelete: () =>
-                                          _deleteReminderWithUndo(r),
-                                      onTap: () => _openEditor(r),
-                                      onToggleSubtask: _toggleSubtask,
-                                    )),
-                                const SizedBox(height: 12),
-                              ],
-
-                              // Active / Non-pinned Section
-                              if (unpinned.isNotEmpty) ...[
-                                if (pinned.isNotEmpty &&
-                                    _activeFilter != FilterType.pinned)
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(4, 6, 4, 6),
-                                    child: Text(
-                                      'TASKS (${unpinned.length})',
-                                      style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textMuted,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
+                              ] else ...[
+                                // 1. Pinned Section
+                                if (pinned.isNotEmpty) ...[
+                                  _buildSectionHeader(
+                                    'PINNED',
+                                    pinned.length,
+                                    icon: Icons.push_pin,
+                                    color: AppColors.accent,
                                   ),
-                                ...unpinned.map((r) => ReminderCard(
-                                      key: ValueKey('rem_${r.id}'),
-                                      reminder: r,
-                                      onToggleComplete: (val) =>
-                                          _toggleComplete(r, val),
-                                      onTogglePin: () => _togglePin(r),
-                                      onDelete: () =>
-                                          _deleteReminderWithUndo(r),
-                                      onTap: () => _openEditor(r),
-                                      onToggleSubtask: _toggleSubtask,
-                                    )),
+                                  ...pinned.map((r) => ReminderCard(
+                                        key: ValueKey('pinned_${r.id}'),
+                                        reminder: r,
+                                        onToggleComplete: (val) =>
+                                            _toggleComplete(r, val),
+                                        onTogglePin: () => _togglePin(r),
+                                        onDelete: () =>
+                                            _deleteReminderWithUndo(r),
+                                        onTap: () => _openEditor(r),
+                                        onToggleSubtask: _toggleSubtask,
+                                      )),
+                                  const SizedBox(height: 6),
+                                ],
+
+                                // 2. Overdue Section
+                                if (overdue.isNotEmpty) ...[
+                                  _buildSectionHeader(
+                                    'OVERDUE / PASSED',
+                                    overdue.length,
+                                    icon: Icons.warning_amber_rounded,
+                                    color: AppColors.danger,
+                                  ),
+                                  ...overdue.map((r) => ReminderCard(
+                                        key: ValueKey('overdue_${r.id}'),
+                                        reminder: r,
+                                        onToggleComplete: (val) =>
+                                            _toggleComplete(r, val),
+                                        onTogglePin: () => _togglePin(r),
+                                        onDelete: () =>
+                                            _deleteReminderWithUndo(r),
+                                        onTap: () => _openEditor(r),
+                                        onToggleSubtask: _toggleSubtask,
+                                      )),
+                                  const SizedBox(height: 6),
+                                ],
+
+                                // 3. Upcoming Section
+                                if (upcoming.isNotEmpty) ...[
+                                  _buildSectionHeader(
+                                    'UPCOMING',
+                                    upcoming.length,
+                                    icon: Icons.schedule,
+                                    color: AppColors.accent,
+                                  ),
+                                  ...upcoming.map((r) => ReminderCard(
+                                        key: ValueKey('upcoming_${r.id}'),
+                                        reminder: r,
+                                        onToggleComplete: (val) =>
+                                            _toggleComplete(r, val),
+                                        onTogglePin: () => _togglePin(r),
+                                        onDelete: () =>
+                                            _deleteReminderWithUndo(r),
+                                        onTap: () => _openEditor(r),
+                                        onToggleSubtask: _toggleSubtask,
+                                      )),
+                                  const SizedBox(height: 6),
+                                ],
+
+                                // 4. Someday / No Date Section
+                                if (someday.isNotEmpty) ...[
+                                  _buildSectionHeader(
+                                    'ALL TASKS',
+                                    someday.length,
+                                    icon: Icons.inbox_outlined,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  ...someday.map((r) => ReminderCard(
+                                        key: ValueKey('someday_${r.id}'),
+                                        reminder: r,
+                                        onToggleComplete: (val) =>
+                                            _toggleComplete(r, val),
+                                        onTogglePin: () => _togglePin(r),
+                                        onDelete: () =>
+                                            _deleteReminderWithUndo(r),
+                                        onTap: () => _openEditor(r),
+                                        onToggleSubtask: _toggleSubtask,
+                                      )),
+                                ],
                               ],
                             ],
                           ),
@@ -507,6 +721,103 @@ class _HomeScreenState extends State<HomeScreen> {
             letterSpacing: -0.2,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard({
+    required String label,
+    required int count,
+    required IconData icon,
+    required Color accentColor,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? accentColor.withValues(alpha: 0.12)
+              : AppColors.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? accentColor : AppColors.cardBorder,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color: isSelected ? accentColor : AppColors.textSecondary,
+                ),
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: count > 0
+                        ? (isSelected ? accentColor : AppColors.textPrimary)
+                        : AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: isSelected ? accentColor : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(
+    String title,
+    int count, {
+    IconData? icon,
+    Color color = AppColors.textMuted,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 10, 4, 6),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            '$title ($count)',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -579,9 +890,18 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_searchQuery.isNotEmpty) {
       message = 'No reminders matching "$_searchQuery"';
       icon = Icons.search_off;
+    } else if (_activeFilter == FilterType.today) {
+      message = 'No reminders due today.';
+      icon = Icons.calendar_today_outlined;
+    } else if (_activeFilter == FilterType.scheduled) {
+      message = 'No scheduled reminders.';
+      icon = Icons.event_outlined;
     } else if (_activeFilter == FilterType.pinned) {
       message = 'No pinned reminders.\nSwipe right on any task to pin it.';
       icon = Icons.push_pin_outlined;
+    } else if (_activeFilter == FilterType.location) {
+      message = 'No geofenced reminders.';
+      icon = Icons.location_on_outlined;
     } else if (_activeFilter == FilterType.completed) {
       message = 'No completed reminders yet.';
       icon = Icons.done_all;

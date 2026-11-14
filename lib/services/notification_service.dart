@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -114,8 +115,8 @@ class NotificationService {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
         return;
       }
-      // Match by timezone offset (milliseconds)
-      final currentOffset = DateTime.now().timeZoneOffset.inMilliseconds;
+      // Match by timezone offset (Duration)
+      final currentOffset = DateTime.now().timeZoneOffset;
       for (final location in tz.timeZoneDatabase.locations.values) {
         if (location.currentTimeZone.offset == currentOffset) {
           tz.setLocalLocation(location);
@@ -198,6 +199,7 @@ class NotificationService {
           priority: Priority.low,
           playSound: false,
           enableVibration: false,
+          color: Color(0xFFFF5500),
           category: AndroidNotificationCategory.reminder,
         );
         break;
@@ -217,14 +219,21 @@ class NotificationService {
           additionalFlags: Int32List.fromList([4]),
           audioAttributesUsage: AudioAttributesUsage.alarm,
           fullScreenIntent: true,
+          color: const Color(0xFFFF5500),
+          colorized: true,
           category: AndroidNotificationCategory.alarm,
           visibility: NotificationVisibility.public,
+          styleInformation: BigTextStyleInformation(
+            body,
+            contentTitle: title,
+            summaryText: 'CRITICAL ALARM',
+          ),
         );
         break;
 
       case ReminderAlertSeverity.short:
       default:
-        androidDetails = const AndroidNotificationDetails(
+        androidDetails = AndroidNotificationDetails(
           shortChannelId,
           shortChannelName,
           channelDescription: shortChannelDesc,
@@ -232,7 +241,13 @@ class NotificationService {
           priority: Priority.high,
           playSound: true,
           enableVibration: true,
+          color: const Color(0xFFFF5500),
           category: AndroidNotificationCategory.reminder,
+          styleInformation: BigTextStyleInformation(
+            body,
+            contentTitle: title,
+            summaryText: 'ilmi Task',
+          ),
         );
         break;
     }

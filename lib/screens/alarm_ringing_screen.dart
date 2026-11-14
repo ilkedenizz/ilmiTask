@@ -145,7 +145,15 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Alarm snoozed for 10 minutes'),
+          content: Text(
+            'Alarm snoozed for 10 minutes',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              color: AppColors.textPrimary,
+              fontSize: 12.5,
+            ),
+          ),
+          backgroundColor: AppColors.card,
           duration: Duration(seconds: 3),
         ),
       );

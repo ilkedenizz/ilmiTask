@@ -7,6 +7,7 @@ import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
 import '../theme/app_colors.dart';
+import '../widgets/dark_date_time_picker_sheet.dart';
 import '../widgets/location_picker_sheet.dart';
 
 class ReminderEditorSheet extends StatefulWidget {
@@ -28,9 +29,10 @@ class ReminderEditorSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.canvas,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        side: BorderSide(color: AppColors.cardBorder, width: 1),
       ),
       builder: (context) => ReminderEditorSheet(
         reminder: reminder,
@@ -105,19 +107,21 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
     final categories = await widget.repository.getAllCategories();
     setState(() {
       _categories = categories;
-      if (_selectedCategoryId == null && _categories.isNotEmpty && widget.reminder == null) {
+      if (_selectedCategoryId == null &&
+          _categories.isNotEmpty &&
+          widget.reminder == null) {
         _selectedCategoryId = _categories.first.id;
       }
     });
   }
 
   Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return const Color(0xFF2196F3);
+    if (hex == null || hex.isEmpty) return AppColors.accent;
     try {
       final formatted = hex.replaceFirst('#', '');
       return Color(int.parse('FF$formatted', radix: 16));
     } catch (_) {
-      return const Color(0xFF2196F3);
+      return AppColors.accent;
     }
   }
 
@@ -150,33 +154,15 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
   }
 
   Future<void> _pickCustomDateTime() async {
-    final now = DateTime.now();
-    final initialDate = _selectedDueDateTime ?? now;
-
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: now.subtract(const Duration(days: 365)),
-      lastDate: now.add(const Duration(days: 3650)),
+    final picked = await DarkDateTimePickerSheet.show(
+      context,
+      initialDateTime: _selectedDueDateTime,
     );
 
-    if (pickedDate == null || !mounted) return;
-
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initialDate),
-    );
-
-    if (pickedTime == null || !mounted) return;
+    if (picked == null || !mounted) return;
 
     setState(() {
-      _selectedDueDateTime = DateTime(
-        pickedDate.year,
-        pickedDate.month,
-        pickedDate.day,
-        pickedTime.hour,
-        pickedTime.minute,
-      );
+      _selectedDueDateTime = picked;
     });
   }
 
@@ -194,7 +180,16 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to attach photo: $e')),
+          SnackBar(
+            content: Text(
+              'Failed to attach photo: $e',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                color: AppColors.textPrimary,
+              ),
+            ),
+            backgroundColor: AppColors.card,
+          ),
         );
       }
     }
@@ -266,9 +261,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isEditing = widget.reminder != null;
-
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return AnimatedPadding(
@@ -279,13 +272,14 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
         height: MediaQuery.of(context).size.height * 0.90,
         child: Column(
           children: [
-            // Header Handle and Action Bar
+            // Top Drag Handle & Action Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    color: AppColors.cardBorder,
+                    width: 1,
                   ),
                 ),
               ),
@@ -293,20 +287,42 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, color: AppColors.textSecondary),
                     tooltip: 'Cancel',
                   ),
                   const SizedBox(width: 8),
                   Text(
                     isEditing ? 'Edit Reminder' : 'New Reminder',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const Spacer(),
                   FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.canvas,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
                     onPressed: _saveReminder,
-                    child: Text(isEditing ? 'Save' : 'Create'),
+                    child: Text(
+                      isEditing ? 'Save' : 'Create',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -325,11 +341,39 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                     TextFormField(
                       controller: _titleController,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
                         labelText: 'Title',
+                        labelStyle: const TextStyle(color: AppColors.textSecondary),
+                        floatingLabelStyle: const TextStyle(color: AppColors.accent),
                         hintText: 'What do you need to be reminded of?',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.task_alt),
+                        hintStyle: const TextStyle(color: AppColors.textMuted),
+                        filled: true,
+                        fillColor: AppColors.surfaceInteractive,
+                        prefixIcon: const Icon(
+                          Icons.task_alt,
+                          color: AppColors.accent,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: AppColors.accent,
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -345,14 +389,41 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                       controller: _notesController,
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 13.5,
+                      ),
+                      decoration: InputDecoration(
                         labelText: 'Notes (optional)',
+                        labelStyle: const TextStyle(color: AppColors.textSecondary),
+                        floatingLabelStyle: const TextStyle(color: AppColors.accent),
                         hintText: 'Add extra details, checklist hints, or links',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.notes),
+                        hintStyle: const TextStyle(color: AppColors.textMuted),
+                        filled: true,
+                        fillColor: AppColors.surfaceInteractive,
+                        prefixIcon: const Icon(
+                          Icons.notes,
+                          color: AppColors.textSecondary,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: AppColors.accent,
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
                     // Category & Pin Toggle Row
                     Row(
@@ -362,10 +433,38 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           child: DropdownButtonFormField<int?>(
                             initialValue: _selectedCategoryId,
                             isExpanded: true,
-                            decoration: const InputDecoration(
+                            dropdownColor: AppColors.card,
+                            iconEnabledColor: AppColors.textSecondary,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                            decoration: InputDecoration(
                               labelText: 'Category',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
+                              labelStyle:
+                                  const TextStyle(color: AppColors.textSecondary),
+                              floatingLabelStyle:
+                                  const TextStyle(color: AppColors.accent),
+                              filled: true,
+                              fillColor: AppColors.surfaceInteractive,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.accent,
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 12,
                               ),
@@ -376,12 +475,22 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                 value: cat.id,
                                 child: Row(
                                   children: [
-                                    CircleAvatar(
-                                      backgroundColor: catColor,
-                                      radius: 6,
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: catColor,
+                                        shape: BoxShape.circle,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(cat.name),
+                                    Text(
+                                      cat.name,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               );
@@ -391,18 +500,17 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
                         // Pin Toggle Switch
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
-                            vertical: 4,
+                            vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            border: Border.all(
-                              color: theme.colorScheme.outlineVariant,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
+                            color: AppColors.surfaceInteractive,
+                            border: Border.all(color: AppColors.cardBorder),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -411,14 +519,29 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                 _isPinned
                                     ? Icons.push_pin
                                     : Icons.push_pin_outlined,
+                                size: 18,
                                 color: _isPinned
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.outline,
+                                    ? AppColors.accent
+                                    : AppColors.textMuted,
                               ),
                               const SizedBox(width: 6),
-                              const Text('Pin'),
+                              const Text(
+                                'Pin',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
                               Switch(
                                 value: _isPinned,
+                                activeThumbColor: AppColors.accent,
+                                activeTrackColor:
+                                    AppColors.accent.withValues(alpha: 0.3),
+                                inactiveThumbColor: AppColors.textMuted,
+                                inactiveTrackColor: AppColors.surfaceInteractive,
                                 onChanged: (val) =>
                                     setState(() => _isPinned = val),
                               ),
@@ -427,65 +550,146 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         ),
                       ],
                     ),
-                    const Divider(height: 36),
+                    const Divider(
+                      height: 36,
+                      color: AppColors.cardBorder,
+                      thickness: 1,
+                    ),
 
                     // Due Date & Time Section
                     Row(
                       children: [
-                        const Icon(Icons.event),
+                        const Icon(
+                          Icons.event,
+                          color: AppColors.accent,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
-                        Text(
+                        const Text(
                           'Schedule Date & Time',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const Spacer(),
                         if (_selectedDueDateTime != null)
                           TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                            ),
                             onPressed: () =>
                                 setState(() => _selectedDueDateTime = null),
-                            icon: const Icon(Icons.clear, size: 16),
-                            label: const Text('No Alert'),
+                            icon: const Icon(Icons.clear, size: 14),
+                            label: const Text(
+                              'No Alert',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    // Quick Preset Chips
+                    const SizedBox(height: 10),
+                    // Quick Preset Chips & Custom Date/Time Button
                     Wrap(
                       spacing: 8,
-                      runSpacing: 6,
+                      runSpacing: 8,
                       children: [
                         ActionChip(
-                          avatar: const Icon(Icons.wb_twilight, size: 16),
+                          avatar: const Icon(
+                            Icons.wb_twilight,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
                           label: const Text('Today Evening'),
+                          labelStyle: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          backgroundColor: AppColors.surfaceInteractive,
+                          side: const BorderSide(color: AppColors.cardBorder),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           onPressed: _setPresetTodayEvening,
                         ),
                         ActionChip(
-                          avatar: const Icon(Icons.wb_sunny_outlined, size: 16),
+                          avatar: const Icon(
+                            Icons.wb_sunny_outlined,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
                           label: const Text('Tomorrow 09:00'),
+                          labelStyle: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          backgroundColor: AppColors.surfaceInteractive,
+                          side: const BorderSide(color: AppColors.cardBorder),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           onPressed: _setPresetTomorrowMorning,
                         ),
                         ActionChip(
-                          avatar: const Icon(Icons.next_plan_outlined, size: 16),
+                          avatar: const Icon(
+                            Icons.next_plan_outlined,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
                           label: const Text('Next Week'),
+                          labelStyle: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          backgroundColor: AppColors.surfaceInteractive,
+                          side: const BorderSide(color: AppColors.cardBorder),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           onPressed: _setPresetNextWeek,
                         ),
                         ActionChip(
-                          avatar: const Icon(Icons.edit_calendar, size: 16),
+                          avatar: Icon(
+                            Icons.edit_calendar,
+                            size: 14,
+                            color: _selectedDueDateTime != null
+                                ? AppColors.accent
+                                : AppColors.textSecondary,
+                          ),
                           label: Text(
                             _selectedDueDateTime != null
                                 ? DateFormat('MMM d, y • HH:mm')
                                     .format(_selectedDueDateTime!)
                                 : 'Custom Date/Time',
                             style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
                               fontWeight: _selectedDueDateTime != null
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                               color: _selectedDueDateTime != null
-                                  ? theme.colorScheme.primary
-                                  : null,
+                                  ? AppColors.accent
+                                  : AppColors.textSecondary,
                             ),
+                          ),
+                          backgroundColor: AppColors.surfaceInteractive,
+                          side: BorderSide(
+                            color: _selectedDueDateTime != null
+                                ? AppColors.accent
+                                : AppColors.cardBorder,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           onPressed: _pickCustomDateTime,
                         ),
@@ -501,10 +705,42 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           child: DropdownButtonFormField<int>(
                             initialValue: _earlyAlertMinutes,
                             isExpanded: true,
-                            decoration: const InputDecoration(
+                            dropdownColor: AppColors.card,
+                            iconEnabledColor: AppColors.textSecondary,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 12.5,
+                            ),
+                            decoration: InputDecoration(
                               labelText: 'Pre-Alert',
-                              prefixIcon: Icon(Icons.hourglass_top),
-                              border: OutlineInputBorder(),
+                              labelStyle:
+                                  const TextStyle(color: AppColors.textSecondary),
+                              floatingLabelStyle:
+                                  const TextStyle(color: AppColors.accent),
+                              prefixIcon: const Icon(
+                                Icons.hourglass_top,
+                                color: AppColors.textSecondary,
+                                size: 18,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surfaceInteractive,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.accent,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                             items: const [
                               DropdownMenuItem(
@@ -541,10 +777,42 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           child: DropdownButtonFormField<String>(
                             initialValue: _repeatRule,
                             isExpanded: true,
-                            decoration: const InputDecoration(
+                            dropdownColor: AppColors.card,
+                            iconEnabledColor: AppColors.textSecondary,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 12.5,
+                            ),
+                            decoration: InputDecoration(
                               labelText: 'Repeat',
-                              prefixIcon: Icon(Icons.repeat),
-                              border: OutlineInputBorder(),
+                              labelStyle:
+                                  const TextStyle(color: AppColors.textSecondary),
+                              floatingLabelStyle:
+                                  const TextStyle(color: AppColors.accent),
+                              prefixIcon: const Icon(
+                                Icons.repeat,
+                                color: AppColors.textSecondary,
+                                size: 18,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surfaceInteractive,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.accent,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                             items: const [
                               DropdownMenuItem(
@@ -577,13 +845,21 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         ),
                       ],
                     ),
-                    const Divider(height: 36),
+                    const Divider(
+                      height: 36,
+                      color: AppColors.cardBorder,
+                      thickness: 1,
+                    ),
 
                     // Alert Severity 3-Tier Selector
-                    Text(
+                    const Text(
                       'Alert Severity',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -595,7 +871,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           title: 'Light',
                           subtitle: 'Silent, in shade',
                           icon: Icons.notifications_none,
-                          color: Colors.blueGrey,
+                          color: AppColors.textSecondary,
                         ),
                         const SizedBox(width: 8),
                         _buildSeverityCard(
@@ -604,7 +880,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           title: 'Short',
                           subtitle: 'Standard chime',
                           icon: Icons.notifications,
-                          color: Colors.blue,
+                          color: AppColors.accent,
                         ),
                         const SizedBox(width: 8),
                         _buildSeverityCard(
@@ -613,21 +889,33 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           title: 'Strong',
                           subtitle: 'Full-screen alarm',
                           icon: Icons.alarm,
-                          color: Colors.red,
+                          color: AppColors.danger,
                         ),
                       ],
                     ),
-                    const Divider(height: 36),
+                    const Divider(
+                      height: 36,
+                      color: AppColors.cardBorder,
+                      thickness: 1,
+                    ),
 
                     // Dynamic Checklist Builder
                     Row(
                       children: [
-                        const Icon(Icons.checklist),
+                        const Icon(
+                          Icons.checklist,
+                          color: AppColors.accent,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Checklist / Subtasks (${_subtasks.length})',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -639,18 +927,49 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         Expanded(
                           child: TextField(
                             controller: _subtaskInputController,
-                            decoration: const InputDecoration(
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                            decoration: InputDecoration(
                               hintText: 'Add a subtask item...',
+                              hintStyle:
+                                  const TextStyle(color: AppColors.textMuted),
                               isDense: true,
-                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: AppColors.surfaceInteractive,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: AppColors.cardBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: AppColors.accent,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                             onSubmitted: (_) => _addSubtask(),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        IconButton.filledTonal(
+                        IconButton.filled(
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.canvas,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                           onPressed: _addSubtask,
-                          icon: const Icon(Icons.add),
+                          icon: const Icon(Icons.add, size: 20),
                           tooltip: 'Add item',
                         ),
                       ],
@@ -672,21 +991,28 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           final item = _subtasks[index];
                           return ListTile(
                             key: ValueKey('st_$index'),
-                            contentPadding: EdgeInsets.zero,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 4),
                             dense: true,
                             leading: Icon(
                               item.isDone
                                   ? Icons.check_box
                                   : Icons.check_box_outline_blank,
+                              size: 20,
                               color: item.isDone
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outline,
+                                  ? AppColors.accent
+                                  : AppColors.textMuted,
                             ),
                             title: Text(
                               item.title,
                               style: TextStyle(
-                                decoration:
-                                    item.isDone ? TextDecoration.lineThrough : null,
+                                fontSize: 13,
+                                color: item.isDone
+                                    ? AppColors.textMuted
+                                    : AppColors.textPrimary,
+                                decoration: item.isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                             ),
                             trailing: Row(
@@ -696,34 +1022,60 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                   icon: const Icon(
                                     Icons.delete_outline,
                                     size: 18,
-                                    color: Colors.red,
+                                    color: AppColors.danger,
                                   ),
                                   onPressed: () => _removeSubtask(index),
                                 ),
-                                const Icon(Icons.drag_handle, size: 18),
+                                const Icon(
+                                  Icons.drag_handle,
+                                  size: 18,
+                                  color: AppColors.dragHandle,
+                                ),
                               ],
                             ),
                           );
                         },
                       ),
-                    const Divider(height: 36),
+                    const Divider(
+                      height: 36,
+                      color: AppColors.cardBorder,
+                      thickness: 1,
+                    ),
 
                     // Image Attachment
                     Row(
                       children: [
-                        const Icon(Icons.attach_file),
+                        const Icon(
+                          Icons.attach_file,
+                          color: AppColors.accent,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
-                        Text(
+                        const Text(
                           'Photo Attachment',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const Spacer(),
                         if (_imagePath != null)
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                            ),
                             onPressed: () => setState(() => _imagePath = null),
-                            child: const Text('Remove'),
+                            child: const Text(
+                              'Remove',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -745,7 +1097,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             right: 8,
                             child: IconButton.filled(
                               style: IconButton.styleFrom(
-                                backgroundColor: Colors.black54,
+                                backgroundColor: Colors.black87,
                               ),
                               onPressed: () =>
                                   setState(() => _imagePath = null),
@@ -758,15 +1110,47 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                       Row(
                         children: [
                           OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppColors.borderInteractive,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              foregroundColor: AppColors.textSecondary,
+                            ),
                             onPressed: () => _pickImage(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('From Gallery'),
+                            icon: const Icon(Icons.photo_library, size: 16),
+                            label: const Text(
+                              'From Gallery',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppColors.borderInteractive,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              foregroundColor: AppColors.textSecondary,
+                            ),
                             onPressed: () => _pickImage(ImageSource.camera),
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('Take Photo'),
+                            icon: const Icon(Icons.camera_alt, size: 16),
+                            label: const Text(
+                              'Take Photo',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -794,7 +1178,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               const Text(
                                 'Location Trigger (Geofencing)',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.textPrimary,
                                 ),
@@ -993,6 +1377,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                   side: const BorderSide(
                                     color: AppColors.cardBorder,
                                   ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       _locationLat = 39.9334;
@@ -1012,6 +1399,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                   side: const BorderSide(
                                     color: AppColors.cardBorder,
                                   ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       _locationLat = 39.9208;
@@ -1030,6 +1420,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                       AppColors.surfaceInteractive,
                                   side: const BorderSide(
                                     color: AppColors.cardBorder,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -1111,48 +1504,49 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
     required IconData icon,
     required Color color,
   }) {
-    final theme = Theme.of(context);
     final isSelected = _alertSeverity == severity;
 
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _alertSeverity = severity),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? color.withValues(alpha: 0.15)
-                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
+                ? color.withValues(alpha: 0.12)
+                : AppColors.surfaceInteractive,
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? color : theme.colorScheme.outlineVariant,
-              width: isSelected ? 2 : 1,
+              color: isSelected ? color : AppColors.cardBorder,
+              width: isSelected ? 1.5 : 1.0,
             ),
           ),
           child: Column(
             children: [
               Icon(
                 icon,
-                color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
-                size: 24,
+                color: isSelected ? color : AppColors.textSecondary,
+                size: 22,
               ),
               const SizedBox(height: 6),
               Text(
                 title,
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: isSelected ? color : theme.colorScheme.onSurface,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: isSelected ? color : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.onSurfaceVariant,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 9.5,
+                  color: AppColors.textMuted,
                 ),
               ),
             ],

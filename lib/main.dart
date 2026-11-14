@@ -179,7 +179,9 @@ class SamsungReminderApp extends StatelessWidget {
           primary: AppColors.accent,
           surface: AppColors.card,
           onSurface: AppColors.textPrimary,
+          surfaceContainerHighest: AppColors.surfaceInteractive,
           outline: AppColors.cardBorder,
+          outlineVariant: AppColors.cardBorder,
         ),
         useMaterial3: true,
         fontFamily: 'sans-serif',
@@ -189,6 +191,41 @@ class SamsungReminderApp extends StatelessWidget {
           margin: EdgeInsets.zero,
         ),
         dividerColor: AppColors.cardBorder,
+        dialogTheme: const DialogThemeData(
+          backgroundColor: AppColors.card,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            side: BorderSide(color: AppColors.cardBorder, width: 1),
+          ),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: AppColors.card,
+          contentTextStyle: const TextStyle(
+            color: AppColors.textPrimary,
+            fontFamily: 'monospace',
+            fontSize: 12.5,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: AppColors.cardBorder),
+          ),
+        ),
+        datePickerTheme: const DatePickerThemeData(
+          backgroundColor: AppColors.card,
+          surfaceTintColor: Colors.transparent,
+          headerBackgroundColor: AppColors.card,
+          headerForegroundColor: AppColors.accent,
+        ),
+        timePickerTheme: const TimePickerThemeData(
+          backgroundColor: AppColors.card,
+          hourMinuteColor: AppColors.surfaceInteractive,
+          hourMinuteTextColor: AppColors.textPrimary,
+          dialHandColor: AppColors.accent,
+          dialBackgroundColor: AppColors.surfaceInteractive,
+          dialTextColor: AppColors.textPrimary,
+          entryModeIconColor: AppColors.accent,
+        ),
       ),
       home: HomeScreen(repository: repository),
     );
