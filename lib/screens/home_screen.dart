@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../data/models/category_model.dart';
 import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
+import '../l10n/app_strings.dart';
 import '../services/geofence_service.dart';
+import '../services/widget_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/category_management_dialog.dart';
 import '../widgets/reminder_card.dart';
@@ -14,6 +17,7 @@ import '../widgets/system_shield_dialog.dart';
 import 'reminder_editor_sheet.dart';
 
 enum FilterType { all, today, scheduled, pinned, location, completed, category }
+enum HomeViewMode { list, calendar }
 
 class HomeScreen extends StatefulWidget {
   final ReminderRepository? repository;
@@ -36,13 +40,24 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _selectedCategoryId;
   String _searchQuery = '';
 
+  // Calendar / Agenda View state
+  HomeViewMode _viewMode = HomeViewMode.list;
+  late DateTime _selectedAgendaDate;
+  late DateTime _agendaViewMonth;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _selectedAgendaDate = DateTime(now.year, now.month, now.day);
+    _agendaViewMonth = DateTime(now.year, now.month, 1);
+
     _repository = widget.repository ?? ReminderRepository();
     _loadData();
+
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       GeofenceMonitorService().startMonitoring(repository: _repository);
+      WidgetService.listenForQuickAdd(() => _openEditor());
     }
   }
 
@@ -64,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _allReminders = reminders;
           _isLoading = false;
         });
+        WidgetService.syncWidgetData(reminders);
       }
     } catch (e, stack) {
       debugPrint('HomeScreen _loadData error: $e\n$stack');
@@ -231,6 +247,18 @@ class _HomeScreenState extends State<HomeScreen> {
     return list;
   }
 
+  List<Reminder> get _agendaRemindersForSelectedDate {
+    final list = _allReminders.where((r) {
+      if (r.dueDatetime == null) return false;
+      final d = r.dueDatetime!;
+      return d.year == _selectedAgendaDate.year &&
+          d.month == _selectedAgendaDate.month &&
+          d.day == _selectedAgendaDate.day;
+    }).toList();
+    _sortRemindersByDueDate(list);
+    return list;
+  }
+
   void _sortRemindersByDueDate(List<Reminder> list) {
     list.sort((a, b) {
       if (a.dueDatetime == null && b.dueDatetime == null) {
@@ -305,10 +333,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openEditor([Reminder? reminder]) async {
+  Future<void> _openEditor([Reminder? reminder, DateTime? prefilledDate]) async {
     final changed = await ReminderEditorSheet.show(
       context,
-      reminder: reminder,
+      reminder: reminder ??
+          (prefilledDate != null
+              ? Reminder(
+                  title: '',
+                  dueDatetime: prefilledDate,
+                  createdAt: DateTime.now(),
+                )
+              : null),
       repository: _repository,
     );
     if (changed == true) {
@@ -323,6 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final pinned = _pinnedList;
     final overdue = _overdueList;
     final upcoming = _upcomingList;
@@ -334,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar: Search Input & Category Management Button
+            // Top Bar: Search Input, Language Toggle & Dialog Buttons
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
@@ -342,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: SearchBar(
                       controller: _searchController,
-                      hintText: 'Search reminders...',
+                      hintText: strings.searchHint,
                       hintStyle: const WidgetStatePropertyAll(
                         TextStyle(
                           color: AppColors.textMuted,
@@ -393,7 +429,69 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+
+                  // Language Toggle Button (TR / EN)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      LocaleController.instance.toggleLocale();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Text(
+                        strings.isTr ? 'TR' : 'EN',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // View Mode Toggle (List vs Calendar)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _viewMode == HomeViewMode.list
+                            ? Icons.calendar_month_outlined
+                            : Icons.view_agenda_outlined,
+                        size: 19,
+                        color: _viewMode == HomeViewMode.calendar
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                      ),
+                      tooltip: _viewMode == HomeViewMode.list
+                          ? strings.viewCalendar
+                          : strings.viewList,
+                      onPressed: () {
+                        setState(() {
+                          _viewMode = _viewMode == HomeViewMode.list
+                              ? HomeViewMode.calendar
+                              : HomeViewMode.list;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // System Shield Button
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.card,
@@ -406,11 +504,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         size: 19,
                         color: AppColors.textSecondary,
                       ),
-                      tooltip: 'System Reliability Shield',
+                      tooltip: strings.systemShieldTitle,
                       onPressed: () => SystemShieldDialog.show(context),
                     ),
                   ),
                   const SizedBox(width: 6),
+
+                  // Category Management Button
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.card,
@@ -423,7 +523,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         size: 19,
                         color: AppColors.textSecondary,
                       ),
-                      tooltip: 'Manage Categories',
+                      tooltip: strings.manageCategories,
                       onPressed: _openCategoryManager,
                     ),
                   ),
@@ -436,272 +536,283 @@ class _HomeScreenState extends State<HomeScreen> {
               onOpenShieldDialog: () => SystemShieldDialog.show(context),
             ),
 
-            // Minimalist Category & Filter Bar
-            SizedBox(
-              height: 38,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  _buildFilterPill(
-                    label: 'All',
-                    selected: _activeFilter == FilterType.all,
-                    onSelected: () {
-                      setState(() {
-                        _activeFilter = FilterType.all;
-                        _selectedCategoryId = null;
-                      });
-                    },
-                  ),
-                  _buildFilterPill(
-                    label: 'Pinned',
-                    icon: Icons.push_pin,
-                    selected: _activeFilter == FilterType.pinned,
-                    onSelected: () {
-                      setState(() {
-                        _activeFilter = FilterType.pinned;
-                        _selectedCategoryId = null;
-                      });
-                    },
-                  ),
-                  _buildFilterPill(
-                    label: 'Completed',
-                    icon: Icons.check_circle_outline,
-                    selected: _activeFilter == FilterType.completed,
-                    onSelected: () {
-                      setState(() {
-                        _activeFilter = FilterType.completed;
-                        _selectedCategoryId = null;
-                      });
-                    },
-                  ),
-                  ..._categories.map((cat) {
-                    final catColor = _parseColor(cat.colorHex);
-                    final isSelected = _activeFilter == FilterType.category &&
-                        _selectedCategoryId == cat.id;
-                    return _buildFilterPill(
-                      label: cat.name,
-                      colorDot: catColor,
-                      selected: isSelected,
+            // Conditional View Rendering: List Mode vs Calendar/Agenda Mode
+            if (_viewMode == HomeViewMode.calendar)
+              Expanded(
+                child: _buildCalendarAgendaView(strings),
+              )
+            else ...[
+              // Minimalist Category & Filter Bar
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _buildFilterPill(
+                      label: strings.all,
+                      selected: _activeFilter == FilterType.all,
                       onSelected: () {
                         setState(() {
-                          _activeFilter = FilterType.category;
-                          _selectedCategoryId = cat.id;
+                          _activeFilter = FilterType.all;
+                          _selectedCategoryId = null;
                         });
                       },
-                    );
-                  }),
-                ],
+                    ),
+                    _buildFilterPill(
+                      label: strings.pinned,
+                      icon: Icons.push_pin,
+                      selected: _activeFilter == FilterType.pinned,
+                      onSelected: () {
+                        setState(() {
+                          _activeFilter = FilterType.pinned;
+                          _selectedCategoryId = null;
+                        });
+                      },
+                    ),
+                    _buildFilterPill(
+                      label: strings.completed,
+                      icon: Icons.check_circle_outline,
+                      selected: _activeFilter == FilterType.completed,
+                      onSelected: () {
+                        setState(() {
+                          _activeFilter = FilterType.completed;
+                          _selectedCategoryId = null;
+                        });
+                      },
+                    ),
+                    ..._categories.map((cat) {
+                      final catColor = _parseColor(cat.colorHex);
+                      final isSelected = _activeFilter == FilterType.category &&
+                          _selectedCategoryId == cat.id;
+                      return _buildFilterPill(
+                        label: cat.name,
+                        colorDot: catColor,
+                        selected: isSelected,
+                        onSelected: () {
+                          setState(() {
+                            _activeFilter = FilterType.category;
+                            _selectedCategoryId = cat.id;
+                          });
+                        },
+                      );
+                    }),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            // Top Summary Cards Grid (Samsung Reminder Dashboard Touch)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Column(
-                children: [
-                  // Row 1: Today & Scheduled
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSummaryCard(
-                          label: 'TODAY',
-                          count: _todayCount,
-                          icon: Icons.calendar_today_outlined,
-                          accentColor: AppColors.accent,
-                          isSelected: _activeFilter == FilterType.today,
-                          onTap: () => _toggleFilter(FilterType.today),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          label: 'SCHEDULED',
-                          count: _scheduledCount,
-                          icon: Icons.event_outlined,
-                          accentColor: const Color(0xFF38BDF8),
-                          isSelected: _activeFilter == FilterType.scheduled,
-                          onTap: () => _toggleFilter(FilterType.scheduled),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Row 2: Important, Location, Done
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSummaryCard(
-                          label: 'IMPORTANT',
-                          count: _pinnedCount,
-                          icon: Icons.push_pin_outlined,
-                          accentColor: AppColors.accentAmber,
-                          isSelected: _activeFilter == FilterType.pinned,
-                          onTap: () => _toggleFilter(FilterType.pinned),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          label: 'LOCATION',
-                          count: _locationCount,
-                          icon: Icons.location_on_outlined,
-                          accentColor: const Color(0xFFA78BFA),
-                          isSelected: _activeFilter == FilterType.location,
-                          onTap: () => _toggleFilter(FilterType.location),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          label: 'DONE',
-                          count: _completedCount,
-                          icon: Icons.check_circle_outline,
-                          accentColor: AppColors.success,
-                          isSelected: _activeFilter == FilterType.completed,
-                          onTap: () => _toggleFilter(FilterType.completed),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Reminders List Body
-            Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : totalCount == 0
-                      ? _buildEmptyState()
-                      : RefreshIndicator(
-                          color: AppColors.accent,
-                          backgroundColor: AppColors.card,
-                          onRefresh: _loadData,
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 88),
-                            children: [
-                              // Completed Mode View
-                              if (_activeFilter == FilterType.completed) ...[
-                                _buildSectionHeader(
-                                  'COMPLETED',
-                                  _filteredReminders.length,
-                                  icon: Icons.check_circle_outline,
-                                  color: AppColors.success,
-                                ),
-                                ..._filteredReminders.map(
-                                  (r) => ReminderCard(
-                                    key: ValueKey('comp_${r.id}'),
-                                    reminder: r,
-                                    onToggleComplete: (val) =>
-                                        _toggleComplete(r, val),
-                                    onTogglePin: () => _togglePin(r),
-                                    onDelete: () =>
-                                        _deleteReminderWithUndo(r),
-                                    onTap: () => _openEditor(r),
-                                    onToggleSubtask: _toggleSubtask,
-                                  ),
-                                ),
-                              ] else ...[
-                                // 1. Pinned Section
-                                if (pinned.isNotEmpty) ...[
-                                  _buildSectionHeader(
-                                    'PINNED',
-                                    pinned.length,
-                                    icon: Icons.push_pin,
-                                    color: AppColors.accent,
-                                  ),
-                                  ...pinned.map((r) => ReminderCard(
-                                        key: ValueKey('pinned_${r.id}'),
-                                        reminder: r,
-                                        onToggleComplete: (val) =>
-                                            _toggleComplete(r, val),
-                                        onTogglePin: () => _togglePin(r),
-                                        onDelete: () =>
-                                            _deleteReminderWithUndo(r),
-                                        onTap: () => _openEditor(r),
-                                        onToggleSubtask: _toggleSubtask,
-                                      )),
-                                  const SizedBox(height: 6),
-                                ],
-
-                                // 2. Overdue Section
-                                if (overdue.isNotEmpty) ...[
-                                  _buildSectionHeader(
-                                    'OVERDUE / PASSED',
-                                    overdue.length,
-                                    icon: Icons.warning_amber_rounded,
-                                    color: AppColors.danger,
-                                  ),
-                                  ...overdue.map((r) => ReminderCard(
-                                        key: ValueKey('overdue_${r.id}'),
-                                        reminder: r,
-                                        onToggleComplete: (val) =>
-                                            _toggleComplete(r, val),
-                                        onTogglePin: () => _togglePin(r),
-                                        onDelete: () =>
-                                            _deleteReminderWithUndo(r),
-                                        onTap: () => _openEditor(r),
-                                        onToggleSubtask: _toggleSubtask,
-                                      )),
-                                  const SizedBox(height: 6),
-                                ],
-
-                                // 3. Upcoming Section
-                                if (upcoming.isNotEmpty) ...[
-                                  _buildSectionHeader(
-                                    'UPCOMING',
-                                    upcoming.length,
-                                    icon: Icons.schedule,
-                                    color: AppColors.accent,
-                                  ),
-                                  ...upcoming.map((r) => ReminderCard(
-                                        key: ValueKey('upcoming_${r.id}'),
-                                        reminder: r,
-                                        onToggleComplete: (val) =>
-                                            _toggleComplete(r, val),
-                                        onTogglePin: () => _togglePin(r),
-                                        onDelete: () =>
-                                            _deleteReminderWithUndo(r),
-                                        onTap: () => _openEditor(r),
-                                        onToggleSubtask: _toggleSubtask,
-                                      )),
-                                  const SizedBox(height: 6),
-                                ],
-
-                                // 4. Someday / No Date Section
-                                if (someday.isNotEmpty) ...[
-                                  _buildSectionHeader(
-                                    'ALL TASKS',
-                                    someday.length,
-                                    icon: Icons.inbox_outlined,
-                                    color: AppColors.textMuted,
-                                  ),
-                                  ...someday.map((r) => ReminderCard(
-                                        key: ValueKey('someday_${r.id}'),
-                                        reminder: r,
-                                        onToggleComplete: (val) =>
-                                            _toggleComplete(r, val),
-                                        onTogglePin: () => _togglePin(r),
-                                        onDelete: () =>
-                                            _deleteReminderWithUndo(r),
-                                        onTap: () => _openEditor(r),
-                                        onToggleSubtask: _toggleSubtask,
-                                      )),
-                                ],
-                              ],
-                            ],
+              // Top Summary Cards Grid (Samsung Reminder Dashboard Touch)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Column(
+                  children: [
+                    // Row 1: Today & Scheduled
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryCard(
+                            label: strings.summaryToday,
+                            count: _todayCount,
+                            icon: Icons.calendar_today_outlined,
+                            accentColor: AppColors.accent,
+                            isSelected: _activeFilter == FilterType.today,
+                            onTap: () => _toggleFilter(FilterType.today),
                           ),
                         ),
-            ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryCard(
+                            label: strings.summaryScheduled,
+                            count: _scheduledCount,
+                            icon: Icons.event_outlined,
+                            accentColor: const Color(0xFF38BDF8),
+                            isSelected: _activeFilter == FilterType.scheduled,
+                            onTap: () => _toggleFilter(FilterType.scheduled),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Row 2: Important, Location, Done
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryCard(
+                            label: strings.summaryImportant,
+                            count: _pinnedCount,
+                            icon: Icons.push_pin_outlined,
+                            accentColor: AppColors.accentAmber,
+                            isSelected: _activeFilter == FilterType.pinned,
+                            onTap: () => _toggleFilter(FilterType.pinned),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryCard(
+                            label: strings.summaryLocation,
+                            count: _locationCount,
+                            icon: Icons.location_on_outlined,
+                            accentColor: const Color(0xFFA78BFA),
+                            isSelected: _activeFilter == FilterType.location,
+                            onTap: () => _toggleFilter(FilterType.location),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryCard(
+                            label: strings.summaryDone,
+                            count: _completedCount,
+                            icon: Icons.check_circle_outline,
+                            accentColor: AppColors.success,
+                            isSelected: _activeFilter == FilterType.completed,
+                            onTap: () => _toggleFilter(FilterType.completed),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Reminders List Body
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : totalCount == 0
+                        ? _buildEmptyState(strings)
+                        : RefreshIndicator(
+                            color: AppColors.accent,
+                            backgroundColor: AppColors.card,
+                            onRefresh: _loadData,
+                            child: ListView(
+                              padding: const EdgeInsets.fromLTRB(14, 4, 14, 88),
+                              children: [
+                                // Completed Mode View
+                                if (_activeFilter == FilterType.completed) ...[
+                                  _buildSectionHeader(
+                                    strings.isTr ? 'TAMAMLANANLAR' : 'COMPLETED',
+                                    _filteredReminders.length,
+                                    icon: Icons.check_circle_outline,
+                                    color: AppColors.success,
+                                  ),
+                                  ..._filteredReminders.map(
+                                    (r) => ReminderCard(
+                                      key: ValueKey('comp_${r.id}'),
+                                      reminder: r,
+                                      onToggleComplete: (val) =>
+                                          _toggleComplete(r, val),
+                                      onTogglePin: () => _togglePin(r),
+                                      onDelete: () =>
+                                          _deleteReminderWithUndo(r),
+                                      onTap: () => _openEditor(r),
+                                      onToggleSubtask: _toggleSubtask,
+                                    ),
+                                  ),
+                                ] else ...[
+                                  // 1. Pinned Section
+                                  if (pinned.isNotEmpty) ...[
+                                    _buildSectionHeader(
+                                      strings.isTr ? 'SABİTLENEN' : 'PINNED',
+                                      pinned.length,
+                                      icon: Icons.push_pin,
+                                      color: AppColors.accent,
+                                    ),
+                                    ...pinned.map((r) => ReminderCard(
+                                          key: ValueKey('pinned_${r.id}'),
+                                          reminder: r,
+                                          onToggleComplete: (val) =>
+                                              _toggleComplete(r, val),
+                                          onTogglePin: () => _togglePin(r),
+                                          onDelete: () =>
+                                              _deleteReminderWithUndo(r),
+                                          onTap: () => _openEditor(r),
+                                          onToggleSubtask: _toggleSubtask,
+                                        )),
+                                    const SizedBox(height: 6),
+                                  ],
+
+                                  // 2. Overdue Section
+                                  if (overdue.isNotEmpty) ...[
+                                    _buildSectionHeader(
+                                      strings.isTr
+                                          ? 'GECİKEN / GEÇMİŞ'
+                                          : 'OVERDUE / PASSED',
+                                      overdue.length,
+                                      icon: Icons.warning_amber_rounded,
+                                      color: AppColors.danger,
+                                    ),
+                                    ...overdue.map((r) => ReminderCard(
+                                          key: ValueKey('overdue_${r.id}'),
+                                          reminder: r,
+                                          onToggleComplete: (val) =>
+                                              _toggleComplete(r, val),
+                                          onTogglePin: () => _togglePin(r),
+                                          onDelete: () =>
+                                              _deleteReminderWithUndo(r),
+                                          onTap: () => _openEditor(r),
+                                          onToggleSubtask: _toggleSubtask,
+                                        )),
+                                    const SizedBox(height: 6),
+                                  ],
+
+                                  // 3. Upcoming Section
+                                  if (upcoming.isNotEmpty) ...[
+                                    _buildSectionHeader(
+                                      strings.isTr ? 'YAKLAŞAN' : 'UPCOMING',
+                                      upcoming.length,
+                                      icon: Icons.schedule,
+                                      color: AppColors.accent,
+                                    ),
+                                    ...upcoming.map((r) => ReminderCard(
+                                          key: ValueKey('upcoming_${r.id}'),
+                                          reminder: r,
+                                          onToggleComplete: (val) =>
+                                              _toggleComplete(r, val),
+                                          onTogglePin: () => _togglePin(r),
+                                          onDelete: () =>
+                                              _deleteReminderWithUndo(r),
+                                          onTap: () => _openEditor(r),
+                                          onToggleSubtask: _toggleSubtask,
+                                        )),
+                                    const SizedBox(height: 6),
+                                  ],
+
+                                  // 4. Someday / No Date Section
+                                  if (someday.isNotEmpty) ...[
+                                    _buildSectionHeader(
+                                      strings.isTr
+                                          ? 'TÜM GÖREVLER'
+                                          : 'ALL TASKS',
+                                      someday.length,
+                                      icon: Icons.inbox_outlined,
+                                      color: AppColors.textMuted,
+                                    ),
+                                    ...someday.map((r) => ReminderCard(
+                                          key: ValueKey('someday_${r.id}'),
+                                          reminder: r,
+                                          onToggleComplete: (val) =>
+                                              _toggleComplete(r, val),
+                                          onTogglePin: () => _togglePin(r),
+                                          onDelete: () =>
+                                              _deleteReminderWithUndo(r),
+                                          onTap: () => _openEditor(r),
+                                          onToggleSubtask: _toggleSubtask,
+                                        )),
+                                  ],
+                                ],
+                              ],
+                            ),
+                          ),
+              ),
+            ],
           ],
         ),
       ),
@@ -712,16 +823,362 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        onPressed: () => _openEditor(),
+        onPressed: () => _openEditor(null, _viewMode == HomeViewMode.calendar ? _selectedAgendaDate : null),
         icon: const Icon(Icons.add, size: 20),
-        label: const Text(
-          'Add reminder',
-          style: TextStyle(
+        label: Text(
+          strings.addReminderFab,
+          style: const TextStyle(
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
           ),
         ),
       ),
+    );
+  }
+
+  // --- CALENDAR / AGENDA VIEW ---
+  Widget _buildCalendarAgendaView(AppStrings strings) {
+    final monthTitle =
+        DateFormat('MMMM yyyy').format(_agendaViewMonth).toUpperCase();
+
+    final daysInMonth = DateTime(
+      _agendaViewMonth.year,
+      _agendaViewMonth.month + 1,
+      0,
+    ).day;
+    final firstWeekday =
+        DateTime(_agendaViewMonth.year, _agendaViewMonth.month, 1).weekday;
+    final leadingEmptyCount = firstWeekday - 1;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final agendaTasks = _agendaRemindersForSelectedDate;
+
+    final formattedAgendaDate = DateFormat('d MMMM y, EEEE')
+        .format(_selectedAgendaDate)
+        .toUpperCase();
+
+    final weekdayLabels = strings.isTr
+        ? const ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ']
+        : const ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 88),
+      children: [
+        // Calendar Card Surface
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Column(
+            children: [
+              // Month navigator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.chevron_left,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _agendaViewMonth = DateTime(
+                          _agendaViewMonth.year,
+                          _agendaViewMonth.month - 1,
+                          1,
+                        );
+                      });
+                    },
+                    tooltip: 'Previous month',
+                  ),
+                  Text(
+                    monthTitle,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _agendaViewMonth = DateTime(
+                          _agendaViewMonth.year,
+                          _agendaViewMonth.month + 1,
+                          1,
+                        );
+                      });
+                    },
+                    tooltip: 'Next month',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+
+              // Weekday labels
+              Row(
+                children: weekdayLabels
+                    .map(
+                      (w) => Expanded(
+                        child: Center(
+                          child: Text(
+                            w,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 8),
+
+              // Calendar Days Grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: leadingEmptyCount + daysInMonth,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  mainAxisSpacing: 6,
+                  crossAxisSpacing: 6,
+                  childAspectRatio: 1.15,
+                ),
+                itemBuilder: (ctx, index) {
+                  if (index < leadingEmptyCount) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final day = index - leadingEmptyCount + 1;
+                  final cellDate = DateTime(
+                    _agendaViewMonth.year,
+                    _agendaViewMonth.month,
+                    day,
+                  );
+                  final isSelected = cellDate.year == _selectedAgendaDate.year &&
+                      cellDate.month == _selectedAgendaDate.month &&
+                      cellDate.day == _selectedAgendaDate.day;
+                  final isToday = cellDate.year == today.year &&
+                      cellDate.month == today.month &&
+                      cellDate.day == today.day;
+
+                  final hasReminders = _allReminders.any((r) {
+                    if (r.dueDatetime == null) return false;
+                    final d = r.dueDatetime!;
+                    return d.year == cellDate.year &&
+                        d.month == cellDate.month &&
+                        d.day == cellDate.day;
+                  });
+
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() => _selectedAgendaDate = cellDate);
+                    },
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.accent
+                            : (isToday
+                                ? AppColors.surfaceInteractive
+                                : Colors.transparent),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.accent
+                              : (isToday
+                                  ? AppColors.accent.withValues(alpha: 0.5)
+                                  : Colors.transparent),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$day',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              fontWeight: isSelected || isToday
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? AppColors.canvas
+                                  : (isToday
+                                      ? AppColors.accent
+                                      : AppColors.textPrimary),
+                            ),
+                          ),
+                          if (hasReminders) ...[
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isSelected
+                                    ? AppColors.canvas
+                                    : AppColors.accent,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Selected Date Agenda Header
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceInteractive,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Text(
+                '${agendaTasks.length} ${strings.isTr ? 'GÖREV' : 'TASKS'}',
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accent,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                formattedAgendaDate,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: AppColors.accent),
+              tooltip: strings.addReminderFab,
+              onPressed: () => _openEditor(
+                null,
+                DateTime(
+                  _selectedAgendaDate.year,
+                  _selectedAgendaDate.month,
+                  _selectedAgendaDate.day,
+                  12,
+                  0,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Tasks for selected date
+        if (agendaTasks.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.event_available_outlined,
+                  size: 36,
+                  color: AppColors.borderInteractive,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  strings.emptyAgendaTitle,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  strings.emptyAgendaSubtitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.accent),
+                    foregroundColor: AppColors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () => _openEditor(
+                    null,
+                    DateTime(
+                      _selectedAgendaDate.year,
+                      _selectedAgendaDate.month,
+                      _selectedAgendaDate.day,
+                      12,
+                      0,
+                    ),
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: Text(
+                    strings.addReminderFab,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...agendaTasks.map(
+            (r) => ReminderCard(
+              key: ValueKey('agenda_${r.id}'),
+              reminder: r,
+              onToggleComplete: (val) => _toggleComplete(r, val),
+              onTogglePin: () => _togglePin(r),
+              onDelete: () => _deleteReminderWithUndo(r),
+              onTap: () => _openEditor(r),
+              onToggleSubtask: _toggleSubtask,
+            ),
+          ),
+      ],
     );
   }
 
@@ -883,30 +1340,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    String message = 'No reminders yet';
+  Widget _buildEmptyState(AppStrings strings) {
+    String message = strings.emptyActiveSubtitle;
     IconData icon = Icons.event_available_outlined;
 
     if (_searchQuery.isNotEmpty) {
       message = 'No reminders matching "$_searchQuery"';
       icon = Icons.search_off;
     } else if (_activeFilter == FilterType.today) {
-      message = 'No reminders due today.';
+      message = strings.isTr ? 'Bugün için planlanan görev yok.' : 'No reminders due today.';
       icon = Icons.calendar_today_outlined;
     } else if (_activeFilter == FilterType.scheduled) {
-      message = 'No scheduled reminders.';
+      message = strings.isTr ? 'Planlanan hatırlatıcı yok.' : 'No scheduled reminders.';
       icon = Icons.event_outlined;
     } else if (_activeFilter == FilterType.pinned) {
-      message = 'No pinned reminders.\nSwipe right on any task to pin it.';
+      message = strings.isTr ? 'Sabitlenen görev yok.' : 'No pinned reminders.';
       icon = Icons.push_pin_outlined;
     } else if (_activeFilter == FilterType.location) {
-      message = 'No geofenced reminders.';
+      message = strings.isTr ? 'Konum uyarılı görev yok.' : 'No geofenced reminders.';
       icon = Icons.location_on_outlined;
     } else if (_activeFilter == FilterType.completed) {
-      message = 'No completed reminders yet.';
+      message = strings.isTr ? 'Henüz tamamlanan görev yok.' : 'No completed reminders yet.';
       icon = Icons.done_all;
     } else if (_activeFilter == FilterType.category) {
-      message = 'No reminders in this category.';
+      message = strings.isTr ? 'Bu kategoride görev yok.' : 'No reminders in this category.';
       icon = Icons.folder_open;
     }
 

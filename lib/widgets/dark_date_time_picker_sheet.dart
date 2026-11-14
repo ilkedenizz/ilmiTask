@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_strings.dart';
 import '../theme/app_colors.dart';
 
 enum PickerMode { date, time }
@@ -45,7 +46,6 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
     final init = widget.initialDateTime ?? DateTime.now();
     _selectedDate = DateTime(init.year, init.month, init.day);
     _selectedHour = init.hour;
-    // Snap minutes to nearest 5 for clean UX if needed, or keep exact
     _selectedMinute = init.minute;
     _viewMonth = DateTime(init.year, init.month, 1);
   }
@@ -82,6 +82,7 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final formattedDate =
         DateFormat('EEE, MMM d, y').format(_selectedDate).toUpperCase();
@@ -134,9 +135,9 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: AppColors.cardBorder),
                       ),
-                      child: const Text(
-                        'SCHEDULE',
-                        style: TextStyle(
+                      child: Text(
+                        strings.isTr ? 'PLANLAMA' : 'SCHEDULE',
+                        style: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -221,7 +222,7 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'DATE',
+                                  strings.isTr ? 'TARİH' : 'DATE',
                                   style: TextStyle(
                                     fontFamily: 'monospace',
                                     fontSize: 11.5,
@@ -262,7 +263,7 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'TIME',
+                                  strings.isTr ? 'SAAT' : 'TIME',
                                   style: TextStyle(
                                     fontFamily: 'monospace',
                                     fontSize: 11.5,
@@ -287,8 +288,8 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   child: _currentMode == PickerMode.date
-                      ? _buildCalendarView()
-                      : _buildTimeView(),
+                      ? _buildCalendarView(strings)
+                      : _buildTimeView(strings),
                 ),
                 const SizedBox(height: 18),
 
@@ -309,9 +310,9 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
                             foregroundColor: AppColors.textSecondary,
                           ),
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'CANCEL',
-                            style: TextStyle(
+                          child: Text(
+                            strings.isTr ? 'İPTAL' : 'CANCEL',
+                            style: const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -337,9 +338,9 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
                           onPressed: () {
                             Navigator.of(context).pop(_composedDateTime);
                           },
-                          child: const Text(
-                            'SET DATE & TIME',
-                            style: TextStyle(
+                          child: Text(
+                            strings.isTr ? 'AYARLA' : 'SET DATE & TIME',
+                            style: const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -360,7 +361,7 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
   }
 
   // --- CALENDAR VIEW ---
-  Widget _buildCalendarView() {
+  Widget _buildCalendarView(AppStrings strings) {
     final monthTitle =
         DateFormat('MMMM yyyy').format(_viewMonth).toUpperCase();
 
@@ -374,6 +375,10 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+
+    final weekdays = strings.isTr
+        ? const ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ']
+        : const ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
     return Column(
       key: const ValueKey('calendar_view'),
@@ -414,7 +419,7 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
 
         // Weekday labels
         Row(
-          children: const ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']
+          children: weekdays
               .map(
                 (w) => Expanded(
                   child: Center(
@@ -509,27 +514,27 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
           runSpacing: 6,
           alignment: WrapAlignment.center,
           children: [
-            _buildQuickChip('Today', () {
+            _buildQuickChip(strings.isTr ? 'Bugün' : 'Today', () {
               setState(() {
                 _selectedDate = today;
                 _viewMonth = DateTime(today.year, today.month, 1);
               });
             }),
-            _buildQuickChip('Tomorrow', () {
+            _buildQuickChip(strings.isTr ? 'Yarın' : 'Tomorrow', () {
               final tom = today.add(const Duration(days: 1));
               setState(() {
                 _selectedDate = tom;
                 _viewMonth = DateTime(tom.year, tom.month, 1);
               });
             }),
-            _buildQuickChip('+3 Days', () {
+            _buildQuickChip(strings.isTr ? '+3 Gün' : '+3 Days', () {
               final d = today.add(const Duration(days: 3));
               setState(() {
                 _selectedDate = d;
                 _viewMonth = DateTime(d.year, d.month, 1);
               });
             }),
-            _buildQuickChip('+1 Week', () {
+            _buildQuickChip(strings.isTr ? '+1 Hafta' : '+1 Week', () {
               final w = today.add(const Duration(days: 7));
               setState(() {
                 _selectedDate = w;
@@ -543,7 +548,7 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
   }
 
   // --- TIME VIEW ---
-  Widget _buildTimeView() {
+  Widget _buildTimeView(AppStrings strings) {
     return Column(
       key: const ValueKey('time_view'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,9 +564,9 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'TIME FINE-TUNE',
-                style: TextStyle(
+              Text(
+                strings.isTr ? 'HASSAS AYAR' : 'TIME FINE-TUNE',
+                style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 10.5,
                   fontWeight: FontWeight.w700,
@@ -571,13 +576,13 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
               ),
               Row(
                 children: [
-                  _buildStepperButton('-15m', () => _adjustMinute(-15)),
+                  _buildStepperButton(strings.isTr ? '-15dk' : '-15m', () => _adjustMinute(-15)),
                   const SizedBox(width: 4),
-                  _buildStepperButton('-5m', () => _adjustMinute(-5)),
+                  _buildStepperButton(strings.isTr ? '-5dk' : '-5m', () => _adjustMinute(-5)),
                   const SizedBox(width: 4),
-                  _buildStepperButton('+5m', () => _adjustMinute(5)),
+                  _buildStepperButton(strings.isTr ? '+5dk' : '+5m', () => _adjustMinute(5)),
                   const SizedBox(width: 4),
-                  _buildStepperButton('+15m', () => _adjustMinute(15)),
+                  _buildStepperButton(strings.isTr ? '+15dk' : '+15m', () => _adjustMinute(15)),
                 ],
               ),
             ],
@@ -586,9 +591,9 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
         const SizedBox(height: 14),
 
         // Hours Section
-        const Text(
-          'HOUR (24-HOUR)',
-          style: TextStyle(
+        Text(
+          strings.isTr ? 'SAAT (24-SAAT)' : 'HOUR (24-HOUR)',
+          style: const TextStyle(
             fontFamily: 'monospace',
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -644,9 +649,9 @@ class _DarkDateTimePickerSheetState extends State<DarkDateTimePickerSheet> {
         const SizedBox(height: 14),
 
         // Minutes Section
-        const Text(
-          'MINUTES',
-          style: TextStyle(
+        Text(
+          strings.isTr ? 'DAKİKA' : 'MINUTES',
+          style: const TextStyle(
             fontFamily: 'monospace',
             fontSize: 10,
             fontWeight: FontWeight.w700,

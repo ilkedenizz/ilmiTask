@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../data/models/reminder_model.dart';
+import '../l10n/app_strings.dart';
 import '../screens/alarm_ringing_screen.dart';
 import '../theme/app_colors.dart';
 
@@ -86,19 +87,21 @@ class _SystemShieldDialogState extends State<SystemShieldDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return AlertDialog(
       backgroundColor: AppColors.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppColors.cardBorder),
       ),
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.shield_outlined, color: AppColors.accent, size: 20),
-          SizedBox(width: 10),
+          const Icon(Icons.shield_outlined, color: AppColors.accent, size: 20),
+          const SizedBox(width: 10),
           Text(
-            'System Reliability Shield',
-            style: TextStyle(
+            strings.systemShieldTitle,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.3,

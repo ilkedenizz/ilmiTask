@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
+import '../l10n/app_strings.dart';
 import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 
@@ -175,6 +176,7 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final timeStr = DateFormat('HH:mm:ss').format(_currentTime);
     final dateStr = DateFormat('EEE, MMM d').format(_currentTime).toUpperCase();
 
@@ -225,9 +227,9 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
                             ),
                           ),
                           const SizedBox(width: 7),
-                          const Text(
-                            'ALARM ACTIVE',
-                            style: TextStyle(
+                          Text(
+                            strings.alarmActive,
+                            style: const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 10.5,
                               fontWeight: FontWeight.w700,
@@ -333,7 +335,12 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'CHECKLIST (${_reminder!.subtasks.where((s) => s.isDone).length}/${_reminder!.subtasks.length})',
+                                        strings.checklistAlarmTitle(
+                                          _reminder!.subtasks
+                                              .where((s) => s.isDone)
+                                              .length,
+                                          _reminder!.subtasks.length,
+                                        ),
                                         style: const TextStyle(
                                           fontFamily: 'monospace',
                                           fontSize: 11,
@@ -433,9 +440,9 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
                                 foregroundColor: AppColors.textSecondary,
                               ),
                               onPressed: _snoozeTenMinutes,
-                              child: const Text(
-                                'Snooze (+10m)',
-                                style: TextStyle(
+                              child: Text(
+                                strings.snooze10m,
+                                style: const TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
@@ -460,9 +467,9 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen>
                                 ),
                               ),
                               onPressed: _dismissAndComplete,
-                              child: const Text(
-                                'Dismiss / Done',
-                                style: TextStyle(
+                              child: Text(
+                                strings.dismissDone,
+                                style: const TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,

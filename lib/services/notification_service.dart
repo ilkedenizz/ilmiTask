@@ -25,6 +25,10 @@ class NotificationService {
   /// Offset applied to create unique notification IDs for early alerts
   static const int earlyAlertIdOffset = 100000;
 
+  /// Action IDs for interactive notification buttons
+  static const String actionComplete = 'action_complete';
+  static const String actionSnooze = 'action_snooze';
+
   // Singleton instance
   static NotificationService instance = NotificationService._internal();
 
@@ -189,6 +193,21 @@ class NotificationService {
   }) {
     AndroidNotificationDetails androidDetails;
 
+    const actions = <AndroidNotificationAction>[
+      AndroidNotificationAction(
+        actionComplete,
+        '✓ Tamamla / Done',
+        showsUserInterface: false,
+        cancelNotification: true,
+      ),
+      AndroidNotificationAction(
+        actionSnooze,
+        '🕒 Ertele / Snooze (+10m)',
+        showsUserInterface: false,
+        cancelNotification: true,
+      ),
+    ];
+
     switch (alertSeverity) {
       case ReminderAlertSeverity.light:
         androidDetails = const AndroidNotificationDetails(
@@ -223,6 +242,7 @@ class NotificationService {
           colorized: true,
           category: AndroidNotificationCategory.alarm,
           visibility: NotificationVisibility.public,
+          actions: actions,
           styleInformation: BigTextStyleInformation(
             body,
             contentTitle: title,
@@ -243,6 +263,7 @@ class NotificationService {
           enableVibration: true,
           color: const Color(0xFFFF5500),
           category: AndroidNotificationCategory.reminder,
+          actions: actions,
           styleInformation: BigTextStyleInformation(
             body,
             contentTitle: title,

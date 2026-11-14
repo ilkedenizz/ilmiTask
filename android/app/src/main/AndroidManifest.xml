@@ -63,6 +63,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- AppWidget Receiver for Android Home Screen Widget -->
+        <receiver
+            android:name=".ReminderAppWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_reminder_info" />
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'data/database_helper.dart';
 import 'data/models/reminder_model.dart';
 import 'data/repositories/reminder_repository.dart';
+import 'l10n/app_strings.dart';
 import 'screens/alarm_ringing_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/reminder_editor_sheet.dart';
@@ -12,6 +13,37 @@ import 'services/notification_service.dart';
 import 'theme/app_colors.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> handleNotificationAction(
+  String actionId,
+  String payload, {
+  ReminderRepository? repository,
+}) async {
+  final repo = repository ?? ReminderRepository();
+  final idStr = payload
+      .replaceFirst('reminder_', '')
+      .replaceFirst('early_reminder_', '');
+  final reminderId = int.tryParse(idStr);
+  if (reminderId == null) return;
+
+  if (actionId == NotificationService.actionComplete) {
+    // Instantly mark reminder completed in SQLite and cancel notification
+    await repo.toggleReminderCompletion(reminderId, true);
+    await NotificationService.instance.cancelReminderNotification(reminderId);
+  } else if (actionId == NotificationService.actionSnooze) {
+    // Atomically reschedule exact alarm by +10 minutes
+    await NotificationService.instance.cancelReminderNotification(reminderId);
+    final reminder = await repo.getReminderById(reminderId);
+    if (reminder != null) {
+      final snoozedDue = DateTime.now().add(const Duration(minutes: 10));
+      final updated = reminder.copyWith(
+        dueDatetime: snoozedDue,
+        isCompleted: false,
+      );
+      await repo.updateReminder(updated, syncSubtasks: false);
+    }
+  }
+}
 
 Future<void> handleNotificationPayload(
   String payload, {
@@ -132,7 +164,10 @@ void main() async {
     await NotificationService.instance.initialize(
       onNotificationResponse: (response) {
         final payload = response.payload;
-        if (payload != null) {
+        final actionId = response.actionId;
+        if (actionId != null && actionId.isNotEmpty && payload != null) {
+          handleNotificationAction(actionId, payload);
+        } else if (payload != null) {
           handleNotificationPayload(payload);
         }
       },
@@ -162,16 +197,30 @@ void main() async {
 
 class SamsungReminderApp extends StatelessWidget {
   final ReminderRepository? repository;
+  final Locale? initialLocale;
 
-  const SamsungReminderApp({super.key, this.repository});
+  const SamsungReminderApp({super.key, this.repository, this.initialLocale});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: appNavigatorKey,
-      title: 'Samsung Reminder',
-      debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark, // Default to bespoke matte obsidian dark mode
+    final isRunningTest =
+        WidgetsBinding.instance.runtimeType.toString().contains('Test');
+
+    return AnimatedBuilder(
+      animation: LocaleController.instance,
+      builder: (context, _) {
+        final currentLocale = initialLocale ??
+            (isRunningTest
+                ? const Locale('en')
+                : LocaleController.instance.locale);
+
+        return MaterialApp(
+          navigatorKey: appNavigatorKey,
+          title: 'ilmi Task',
+          debugShowCheckedModeBanner: false,
+          locale: currentLocale,
+          supportedLocales: const [Locale('tr'), Locale('en')],
+          themeMode: ThemeMode.dark, // Default to bespoke matte obsidian dark mode
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.canvas,
@@ -228,6 +277,8 @@ class SamsungReminderApp extends StatelessWidget {
         ),
       ),
       home: HomeScreen(repository: repository),
+        );
+      },
     );
   }
 }

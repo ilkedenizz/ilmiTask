@@ -6,6 +6,7 @@ import '../data/models/category_model.dart';
 import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
+import '../l10n/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../widgets/dark_date_time_picker_sheet.dart';
 import '../widgets/location_picker_sheet.dart';
@@ -261,6 +262,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final isEditing = widget.reminder != null;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
@@ -288,11 +290,11 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                    tooltip: 'Cancel',
+                    tooltip: strings.cancel,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isEditing ? 'Edit Reminder' : 'New Reminder',
+                    isEditing ? strings.editReminder : strings.newReminder,
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 14,
@@ -316,7 +318,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                     ),
                     onPressed: _saveReminder,
                     child: Text(
-                      isEditing ? 'Save' : 'Create',
+                      isEditing ? strings.save : strings.create,
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.w700,
@@ -347,10 +349,10 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         fontWeight: FontWeight.w600,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Title',
+                        labelText: strings.titleLabel,
                         labelStyle: const TextStyle(color: AppColors.textSecondary),
                         floatingLabelStyle: const TextStyle(color: AppColors.accent),
-                        hintText: 'What do you need to be reminded of?',
+                        hintText: strings.titleHint,
                         hintStyle: const TextStyle(color: AppColors.textMuted),
                         filled: true,
                         fillColor: AppColors.surfaceInteractive,
@@ -377,7 +379,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter a reminder title';
+                          return strings.titleValidation;
                         }
                         return null;
                       },
@@ -394,10 +396,10 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         fontSize: 13.5,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Notes (optional)',
+                        labelText: strings.notesLabel,
                         labelStyle: const TextStyle(color: AppColors.textSecondary),
                         floatingLabelStyle: const TextStyle(color: AppColors.accent),
-                        hintText: 'Add extra details, checklist hints, or links',
+                        hintText: strings.notesHint,
                         hintStyle: const TextStyle(color: AppColors.textMuted),
                         filled: true,
                         fillColor: AppColors.surfaceInteractive,
@@ -440,7 +442,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               fontSize: 13,
                             ),
                             decoration: InputDecoration(
-                              labelText: 'Category',
+                              labelText: strings.categoryLabel,
                               labelStyle:
                                   const TextStyle(color: AppColors.textSecondary),
                               floatingLabelStyle:
@@ -525,9 +527,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                     : AppColors.textMuted,
                               ),
                               const SizedBox(width: 6),
-                              const Text(
-                                'Pin',
-                                style: TextStyle(
+                              Text(
+                                strings.pinLabel,
+                                style: const TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -565,9 +567,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           size: 18,
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Schedule Date & Time',
-                          style: TextStyle(
+                        Text(
+                          strings.scheduleDateTime,
+                          style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -584,9 +586,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             onPressed: () =>
                                 setState(() => _selectedDueDateTime = null),
                             icon: const Icon(Icons.clear, size: 14),
-                            label: const Text(
-                              'No Alert',
-                              style: TextStyle(
+                            label: Text(
+                              strings.noAlert,
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -607,7 +609,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             size: 14,
                             color: AppColors.textSecondary,
                           ),
-                          label: const Text('Today Evening'),
+                          label: Text(strings.todayEvening),
                           labelStyle: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
@@ -626,7 +628,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             size: 14,
                             color: AppColors.textSecondary,
                           ),
-                          label: const Text('Tomorrow 09:00'),
+                          label: Text(strings.tomorrowMorning),
                           labelStyle: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
@@ -645,7 +647,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             size: 14,
                             color: AppColors.textSecondary,
                           ),
-                          label: const Text('Next Week'),
+                          label: Text(strings.nextWeek),
                           labelStyle: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
@@ -670,7 +672,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             _selectedDueDateTime != null
                                 ? DateFormat('MMM d, y • HH:mm')
                                     .format(_selectedDueDateTime!)
-                                : 'Custom Date/Time',
+                                : strings.customDateTime,
                             style: TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 11,
@@ -712,7 +714,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               fontSize: 12.5,
                             ),
                             decoration: InputDecoration(
-                              labelText: 'Pre-Alert',
+                              labelText: strings.preAlertLabel,
                               labelStyle:
                                   const TextStyle(color: AppColors.textSecondary),
                               floatingLabelStyle:
@@ -742,26 +744,26 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                 ),
                               ),
                             ),
-                            items: const [
+                            items: [
                               DropdownMenuItem(
                                 value: 0,
-                                child: Text('None (On time)'),
+                                child: Text(strings.isTr ? 'Yok (Zamanında)' : 'None (On time)'),
                               ),
                               DropdownMenuItem(
                                 value: 15,
-                                child: Text('15 mins before'),
+                                child: Text(strings.isTr ? '15 dk önce' : '15 mins before'),
                               ),
                               DropdownMenuItem(
                                 value: 30,
-                                child: Text('30 mins before'),
+                                child: Text(strings.isTr ? '30 dk önce' : '30 mins before'),
                               ),
                               DropdownMenuItem(
                                 value: 60,
-                                child: Text('1 hour before'),
+                                child: Text(strings.isTr ? '1 saat önce' : '1 hour before'),
                               ),
                               DropdownMenuItem(
                                 value: 1440,
-                                child: Text('1 day before'),
+                                child: Text(strings.isTr ? '1 gün önce' : '1 day before'),
                               ),
                             ],
                             onChanged: (val) {
@@ -784,7 +786,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               fontSize: 12.5,
                             ),
                             decoration: InputDecoration(
-                              labelText: 'Repeat',
+                              labelText: strings.repeatLabel,
                               labelStyle:
                                   const TextStyle(color: AppColors.textSecondary),
                               floatingLabelStyle:
@@ -814,26 +816,26 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                 ),
                               ),
                             ),
-                            items: const [
+                            items: [
                               DropdownMenuItem(
                                 value: ReminderRepeatRule.none,
-                                child: Text('None'),
+                                child: Text(strings.isTr ? 'Yok' : 'None'),
                               ),
                               DropdownMenuItem(
                                 value: ReminderRepeatRule.daily,
-                                child: Text('Daily'),
+                                child: Text(strings.isTr ? 'Günlük' : 'Daily'),
                               ),
                               DropdownMenuItem(
                                 value: ReminderRepeatRule.weekdays,
-                                child: Text('Weekdays'),
+                                child: Text(strings.isTr ? 'Hafta içi' : 'Weekdays'),
                               ),
                               DropdownMenuItem(
                                 value: ReminderRepeatRule.weekly,
-                                child: Text('Weekly'),
+                                child: Text(strings.isTr ? 'Haftalık' : 'Weekly'),
                               ),
                               DropdownMenuItem(
                                 value: ReminderRepeatRule.monthly,
-                                child: Text('Monthly'),
+                                child: Text(strings.isTr ? 'Aylık' : 'Monthly'),
                               ),
                             ],
                             onChanged: (val) {
@@ -852,9 +854,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                     ),
 
                     // Alert Severity 3-Tier Selector
-                    const Text(
-                      'Alert Severity',
-                      style: TextStyle(
+                    Text(
+                      strings.alertSeverityLabel,
+                      style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -868,8 +870,8 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         _buildSeverityCard(
                           context,
                           severity: ReminderAlertSeverity.light,
-                          title: 'Light',
-                          subtitle: 'Silent, in shade',
+                          title: strings.severityLightTitle,
+                          subtitle: strings.severityLightSub,
                           icon: Icons.notifications_none,
                           color: AppColors.textSecondary,
                         ),
@@ -877,8 +879,8 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         _buildSeverityCard(
                           context,
                           severity: ReminderAlertSeverity.short,
-                          title: 'Short',
-                          subtitle: 'Standard chime',
+                          title: strings.severityShortTitle,
+                          subtitle: strings.severityShortSub,
                           icon: Icons.notifications,
                           color: AppColors.accent,
                         ),
@@ -886,8 +888,8 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         _buildSeverityCard(
                           context,
                           severity: ReminderAlertSeverity.strongFullscreen,
-                          title: 'Strong',
-                          subtitle: 'Full-screen alarm',
+                          title: strings.severityStrongTitle,
+                          subtitle: strings.severityStrongSub,
                           icon: Icons.alarm,
                           color: AppColors.danger,
                         ),
@@ -909,7 +911,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Checklist / Subtasks (${_subtasks.length})',
+                          strings.checklistTitle(_subtasks.length),
                           style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 12,
@@ -932,7 +934,7 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               fontSize: 13,
                             ),
                             decoration: InputDecoration(
-                              hintText: 'Add a subtask item...',
+                              hintText: strings.addSubtaskHint,
                               hintStyle:
                                   const TextStyle(color: AppColors.textMuted),
                               isDense: true,
@@ -1051,9 +1053,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           size: 18,
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Photo Attachment',
-                          style: TextStyle(
+                        Text(
+                          strings.photoAttachment,
+                          style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -1068,9 +1070,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               foregroundColor: AppColors.danger,
                             ),
                             onPressed: () => setState(() => _imagePath = null),
-                            child: const Text(
-                              'Remove',
-                              style: TextStyle(
+                            child: Text(
+                              strings.remove,
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -1121,9 +1123,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             ),
                             onPressed: () => _pickImage(ImageSource.gallery),
                             icon: const Icon(Icons.photo_library, size: 16),
-                            label: const Text(
-                              'From Gallery',
-                              style: TextStyle(
+                            label: Text(
+                              strings.fromGallery,
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -1143,9 +1145,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                             ),
                             onPressed: () => _pickImage(ImageSource.camera),
                             icon: const Icon(Icons.camera_alt, size: 16),
-                            label: const Text(
-                              'Take Photo',
-                              style: TextStyle(
+                            label: Text(
+                              strings.takePhoto,
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -1175,9 +1177,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                 color: AppColors.accent,
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'Location Trigger (Geofencing)',
-                                style: TextStyle(
+                              Text(
+                                strings.locationTriggerSection,
+                                style: const TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.textPrimary,
@@ -1206,9 +1208,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                           ),
                           if (_enableLocation) ...[
                             const SizedBox(height: 12),
-                            const Text(
-                              'TRIGGER TYPE',
-                              style: TextStyle(
+                            Text(
+                              strings.triggerTypeLabel,
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -1221,8 +1223,8 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               children: [
                                 Expanded(
                                   child: ChoiceChip(
-                                    label: const Center(
-                                      child: Text('ARRIVING'),
+                                    label: Center(
+                                      child: Text(strings.arriving),
                                     ),
                                     labelStyle: TextStyle(
                                       fontFamily: 'monospace',
@@ -1257,8 +1259,8 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: ChoiceChip(
-                                    label: const Center(
-                                      child: Text('LEAVING'),
+                                    label: Center(
+                                      child: Text(strings.leaving),
                                     ),
                                     labelStyle: TextStyle(
                                       fontFamily: 'monospace',
@@ -1293,9 +1295,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            const Text(
-                              'GEOFENCE RADIUS',
-                              style: TextStyle(
+                            Text(
+                              strings.geofenceRadiusLabel,
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -1340,9 +1342,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                               mainAxisAlignment:
                                   MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'COORDINATES',
-                                  style: TextStyle(
+                                Text(
+                                  strings.coordinatesLabel,
+                                  style: const TextStyle(
                                     fontFamily: 'monospace',
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
@@ -1471,9 +1473,9 @@ class _ReminderEditorSheetState extends State<ReminderEditorSheet> {
                                   }
                                 },
                                 icon: const Icon(Icons.map_outlined, size: 16),
-                                label: const Text(
-                                  'Open Dark Map Picker',
-                                  style: TextStyle(
+                                label: Text(
+                                  strings.openDarkMapPicker,
+                                  style: const TextStyle(
                                     fontFamily: 'monospace',
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
