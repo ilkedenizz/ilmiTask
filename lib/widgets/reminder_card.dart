@@ -75,26 +75,33 @@ class ReminderCard extends StatelessWidget {
       background: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E232B),
+          color: const Color(0xFF0F291E),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderInteractive),
+          border: Border.all(
+            color: AppColors.success.withValues(alpha: 0.6),
+            width: 1,
+          ),
         ),
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
           children: [
             Icon(
-              reminder.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-              color: AppColors.accent,
+              reminder.isCompleted
+                  ? Icons.replay
+                  : Icons.check_circle_outline,
+              color: AppColors.success,
               size: 20,
             ),
             const SizedBox(width: 8),
             Text(
-              reminder.isPinned ? 'Unpin' : 'Pin',
+              reminder.isCompleted ? 'REOPEN' : 'COMPLETE',
               style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+                fontFamily: 'monospace',
+                color: AppColors.success,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 0.8,
               ),
             ),
           ],
@@ -103,9 +110,12 @@ class ReminderCard extends StatelessWidget {
       secondaryBackground: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A1417),
+          color: const Color(0xFF2A1012),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF4C1D24)),
+          border: Border.all(
+            color: AppColors.danger.withValues(alpha: 0.6),
+            width: 1,
+          ),
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -113,25 +123,30 @@ class ReminderCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             Text(
-              'Delete',
+              'DELETE',
               style: TextStyle(
-                color: Color(0xFFF87171),
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+                fontFamily: 'monospace',
+                color: AppColors.danger,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 0.8,
               ),
             ),
             SizedBox(width: 8),
-            Icon(Icons.delete_outline, color: Color(0xFFF87171), size: 20),
+            Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
           ],
         ),
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          onTogglePin();
+          onToggleComplete(!reminder.isCompleted);
           return false;
-        } else {
+        }
+        return true;
+      },
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
           onDelete();
-          return true;
         }
       },
       child: Container(

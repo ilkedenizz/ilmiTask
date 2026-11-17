@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.44+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
   <img src="https://img.shields.io/badge/SQLite-sqflite%202.4-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
   <img src="https://img.shields.io/badge/Design-Obsidian%20%26%20Amber-FF5500?style=for-the-badge" alt="Obsidian and Amber" />
-  <img src="https://img.shields.io/badge/Tests-27%2F27%20Passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-30%2F30%20Passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests" />
   <img src="https://img.shields.io/badge/Author-Racc%20Lab-9CA3AF?style=for-the-badge" alt="Racc Lab" />
 </p>
 
@@ -61,6 +61,12 @@
 - **Smooth Calendar Transitions & Timeline**: Monthly calendar features directional sliding transitions, swipe gestures (`GestureDetector`), quick-jump `[ BUGÜN ]` shortcut, and an editorial vertical timeline for the selected day's agenda.
 - **Idempotent Background Notification Actions**: Hardened notification response handlers with background isolate timezone initialization, payload prefix resolution, dedicated snooze IDs preserving repeating schedules, and live UI synchronization via `AppEvents`.
 - **Zero-Friction Day Scheduling**: Selected date headers and empty agenda cards feature direct one-tap "Bu güne hatırlatıcı ekle" buttons pre-filling the exact date.
+
+### Phase 8: Smooth Swipe Gestures, Dynamic Categories & 60fps Performance
+- **Fluid Dismissible Gestures**: Swipe right on reminder cards to toggle completion instantly with emerald green feedback (`#10B981`); swipe left to trigger instant delete with an interactive undo SnackBar.
+- **Dynamic Category Management**: Custom category filter pills support direct filtering and long-press interactions to rename categories and update custom color palettes in SQLite.
+- **Active Filter Toggle Hierarchy**: Bento summary cards (Today, Scheduled, Important, Location, Done) act as high-visibility primary filter toggles with glowing `#FF5500` amber state indicators.
+- **Single-Pass $O(N)$ Partitioning & Lazy Builders**: Migrated list views to `ListView.builder` with single-pass partitioning, eliminating redundant filtering passes for 60fps smooth scrolling.
 
 ---
 
@@ -129,7 +135,7 @@ flutter analyze
 
 # Run full test suite
 flutter test
-# Output: 00:03 +22: All tests passed!
+# Output: 00:04 +30: All tests passed!
 ```
 
 ---

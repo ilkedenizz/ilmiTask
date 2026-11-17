@@ -216,56 +216,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return list;
   }
 
-  // Section Partitioning
-  List<Reminder> get _pinnedList {
-    if (_activeFilter == FilterType.completed) return [];
-    final pinned = _filteredReminders.where((r) => r.isPinned).toList();
-    _sortRemindersByDueDate(pinned);
-    return pinned;
-  }
-
-  List<Reminder> get _overdueList {
-    if (_activeFilter == FilterType.completed ||
-        _activeFilter == FilterType.pinned) {
-      return [];
-    }
-    final now = DateTime.now();
-    final list = _filteredReminders
-        .where((r) =>
-            !r.isPinned && r.dueDatetime != null && r.dueDatetime!.isBefore(now))
-        .toList();
-    _sortRemindersByDueDate(list);
-    return list;
-  }
-
-  List<Reminder> get _upcomingList {
-    if (_activeFilter == FilterType.completed ||
-        _activeFilter == FilterType.pinned) {
-      return [];
-    }
-    final now = DateTime.now();
-    final list = _filteredReminders
-        .where((r) =>
-            !r.isPinned &&
-            r.dueDatetime != null &&
-            !r.dueDatetime!.isBefore(now))
-        .toList();
-    _sortRemindersByDueDate(list);
-    return list;
-  }
-
-  List<Reminder> get _somedayList {
-    if (_activeFilter == FilterType.completed ||
-        _activeFilter == FilterType.pinned) {
-      return [];
-    }
-    final list = _filteredReminders
-        .where((r) => !r.isPinned && r.dueDatetime == null)
-        .toList();
-    _sortRemindersByDueDate(list);
-    return list;
-  }
-
   List<Reminder> get _agendaRemindersForSelectedDate {
     final list = _allReminders.where((r) {
       if (r.dueDatetime == null) return false;
@@ -378,11 +328,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    final pinned = _pinnedList;
-    final overdue = _overdueList;
-    final upcoming = _upcomingList;
-    final someday = _somedayList;
-    final totalCount = _filteredReminders.length;
+    final filtered = _filteredReminders;
+    final totalCount = filtered.length;
+
+    // High-performance single-pass partitioning
+    final pinned = <Reminder>[];
+    final overdue = <Reminder>[];
+    final upcoming = <Reminder>[];
+    final someday = <Reminder>[];
+
+    final now = DateTime.now();
+    if (_activeFilter != FilterType.completed) {
+      for (final r in filtered) {
+        if (r.isPinned) {
+          pinned.add(r);
+        } else if (_activeFilter != FilterType.pinned) {
+          if (r.dueDatetime == null) {
+            someday.add(r);
+          } else if (r.dueDatetime!.isBefore(now)) {
+            overdue.add(r);
+          } else {
+            upcoming.add(r);
+          }
+        }
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -725,9 +695,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         selected: isSelected,
                         onSelected: () {
                           setState(() {
-                            _activeFilter = FilterType.category;
-                            _selectedCategoryId = cat.id;
+                            if (_activeFilter == FilterType.category &&
+                                _selectedCategoryId == cat.id) {
+                              _activeFilter = FilterType.all;
+                              _selectedCategoryId = null;
+                            } else {
+                              _activeFilter = FilterType.category;
+                              _selectedCategoryId = cat.id;
+                            }
                           });
+                        },
+                        onLongPress: () async {
+                          await CategoryManagementDialog.show(
+                            context,
+                            repository: _repository,
+                            initialCategoryToEdit: cat,
+                          );
+                          await _loadData();
                         },
                       );
                     }),
@@ -826,40 +810,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             color: AppColors.accent,
                             backgroundColor: AppColors.card,
                             onRefresh: _loadData,
-                            child: ListView(
-                              padding: const EdgeInsets.fromLTRB(14, 4, 14, 88),
-                              children: [
+                            child: Builder(
+                              builder: (context) {
+                                final listItems = <Widget>[];
+
                                 // Completed Mode View
-                                if (_activeFilter == FilterType.completed) ...[
-                                  _buildSectionHeader(
-                                    strings.isTr ? 'TAMAMLANANLAR' : 'COMPLETED',
-                                    _filteredReminders.length,
-                                    icon: Icons.check_circle_outline,
-                                    color: AppColors.success,
-                                  ),
-                                  ..._filteredReminders.map(
-                                    (r) => ReminderCard(
-                                      key: ValueKey('comp_${r.id}'),
-                                      reminder: r,
-                                      onToggleComplete: (val) =>
-                                          _toggleComplete(r, val),
-                                      onTogglePin: () => _togglePin(r),
-                                      onDelete: () =>
-                                          _deleteReminderWithUndo(r),
-                                      onTap: () => _openEditor(r),
-                                      onToggleSubtask: _toggleSubtask,
-                                    ),
-                                  ),
-                                ] else ...[
-                                  // 1. Pinned Section
-                                  if (pinned.isNotEmpty) ...[
+                                if (_activeFilter == FilterType.completed) {
+                                  listItems.add(
                                     _buildSectionHeader(
-                                      strings.isTr ? 'SABİTLENEN' : 'PINNED',
-                                      pinned.length,
-                                      icon: Icons.push_pin,
-                                      color: AppColors.accent,
+                                      strings.isTr
+                                          ? 'TAMAMLANANLAR'
+                                          : 'COMPLETED',
+                                      filtered.length,
+                                      icon: Icons.check_circle_outline,
+                                      color: AppColors.success,
                                     ),
-                                    ...pinned.map((r) => ReminderCard(
+                                  );
+                                  for (final r in filtered) {
+                                    listItems.add(
+                                      ReminderCard(
+                                        key: ValueKey('comp_${r.id}'),
+                                        reminder: r,
+                                        onToggleComplete: (val) =>
+                                            _toggleComplete(r, val),
+                                        onTogglePin: () => _togglePin(r),
+                                        onDelete: () =>
+                                            _deleteReminderWithUndo(r),
+                                        onTap: () => _openEditor(r),
+                                        onToggleSubtask: _toggleSubtask,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  // 1. Pinned Section
+                                  if (pinned.isNotEmpty) {
+                                    listItems.add(
+                                      _buildSectionHeader(
+                                        strings.isTr ? 'SABİTLENEN' : 'PINNED',
+                                        pinned.length,
+                                        icon: Icons.push_pin,
+                                        color: AppColors.accent,
+                                      ),
+                                    );
+                                    for (final r in pinned) {
+                                      listItems.add(
+                                        ReminderCard(
                                           key: ValueKey('pinned_${r.id}'),
                                           reminder: r,
                                           onToggleComplete: (val) =>
@@ -869,21 +864,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               _deleteReminderWithUndo(r),
                                           onTap: () => _openEditor(r),
                                           onToggleSubtask: _toggleSubtask,
-                                        )),
-                                    const SizedBox(height: 6),
-                                  ],
+                                        ),
+                                      );
+                                    }
+                                    listItems.add(const SizedBox(height: 6));
+                                  }
 
                                   // 2. Overdue Section
-                                  if (overdue.isNotEmpty) ...[
-                                    _buildSectionHeader(
-                                      strings.isTr
-                                          ? 'GECİKEN / GEÇMİŞ'
-                                          : 'OVERDUE / PASSED',
-                                      overdue.length,
-                                      icon: Icons.warning_amber_rounded,
-                                      color: AppColors.danger,
-                                    ),
-                                    ...overdue.map((r) => ReminderCard(
+                                  if (overdue.isNotEmpty) {
+                                    listItems.add(
+                                      _buildSectionHeader(
+                                        strings.isTr
+                                            ? 'GECİKEN / GEÇMİŞ'
+                                            : 'OVERDUE / PASSED',
+                                        overdue.length,
+                                        icon: Icons.warning_amber_rounded,
+                                        color: AppColors.danger,
+                                      ),
+                                    );
+                                    for (final r in overdue) {
+                                      listItems.add(
+                                        ReminderCard(
                                           key: ValueKey('overdue_${r.id}'),
                                           reminder: r,
                                           onToggleComplete: (val) =>
@@ -893,19 +894,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               _deleteReminderWithUndo(r),
                                           onTap: () => _openEditor(r),
                                           onToggleSubtask: _toggleSubtask,
-                                        )),
-                                    const SizedBox(height: 6),
-                                  ],
+                                        ),
+                                      );
+                                    }
+                                    listItems.add(const SizedBox(height: 6));
+                                  }
 
                                   // 3. Upcoming Section
-                                  if (upcoming.isNotEmpty) ...[
-                                    _buildSectionHeader(
-                                      strings.isTr ? 'YAKLAŞAN' : 'UPCOMING',
-                                      upcoming.length,
-                                      icon: Icons.schedule,
-                                      color: AppColors.accent,
-                                    ),
-                                    ...upcoming.map((r) => ReminderCard(
+                                  if (upcoming.isNotEmpty) {
+                                    listItems.add(
+                                      _buildSectionHeader(
+                                        strings.isTr
+                                            ? 'YAKLAŞAN'
+                                            : 'UPCOMING',
+                                        upcoming.length,
+                                        icon: Icons.schedule,
+                                        color: AppColors.accent,
+                                      ),
+                                    );
+                                    for (final r in upcoming) {
+                                      listItems.add(
+                                        ReminderCard(
                                           key: ValueKey('upcoming_${r.id}'),
                                           reminder: r,
                                           onToggleComplete: (val) =>
@@ -915,21 +924,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               _deleteReminderWithUndo(r),
                                           onTap: () => _openEditor(r),
                                           onToggleSubtask: _toggleSubtask,
-                                        )),
-                                    const SizedBox(height: 6),
-                                  ],
+                                        ),
+                                      );
+                                    }
+                                    listItems.add(const SizedBox(height: 6));
+                                  }
 
                                   // 4. Someday / No Date Section
-                                  if (someday.isNotEmpty) ...[
-                                    _buildSectionHeader(
-                                      strings.isTr
-                                          ? 'TÜM GÖREVLER'
-                                          : 'ALL TASKS',
-                                      someday.length,
-                                      icon: Icons.inbox_outlined,
-                                      color: AppColors.textMuted,
-                                    ),
-                                    ...someday.map((r) => ReminderCard(
+                                  if (someday.isNotEmpty) {
+                                    listItems.add(
+                                      _buildSectionHeader(
+                                        strings.isTr
+                                            ? 'TÜM GÖREVLER'
+                                            : 'ALL TASKS',
+                                        someday.length,
+                                        icon: Icons.inbox_outlined,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    );
+                                    for (final r in someday) {
+                                      listItems.add(
+                                        ReminderCard(
                                           key: ValueKey('someday_${r.id}'),
                                           reminder: r,
                                           onToggleComplete: (val) =>
@@ -939,10 +954,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               _deleteReminderWithUndo(r),
                                           onTap: () => _openEditor(r),
                                           onToggleSubtask: _toggleSubtask,
-                                        )),
-                                  ],
-                                ],
-                              ],
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+
+                                return ListView.builder(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(14, 4, 14, 88),
+                                  itemCount: listItems.length,
+                                  itemBuilder: (context, index) =>
+                                      listItems[index],
+                                );
+                              },
                             ),
                           ),
               ),
@@ -1616,15 +1641,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? accentColor.withValues(alpha: 0.12)
+              ? AppColors.accent.withValues(alpha: 0.16)
               : AppColors.card,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? accentColor : AppColors.cardBorder,
+            color: isSelected ? AppColors.accent : AppColors.cardBorder,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -1635,10 +1660,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  icon,
-                  size: 15,
-                  color: isSelected ? accentColor : AppColors.textSecondary,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 15,
+                      color: isSelected
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                          color: AppColors.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 Text(
                   '$count',
@@ -1647,8 +1690,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: count > 0
-                        ? (isSelected ? accentColor : AppColors.textPrimary)
-                        : AppColors.textMuted,
+                        ? (isSelected ? AppColors.accent : AppColors.textPrimary)
+                        : (isSelected ? AppColors.accent : AppColors.textMuted),
                   ),
                 ),
               ],
@@ -1663,7 +1706,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.6,
-                color: isSelected ? accentColor : AppColors.textSecondary,
+                color: isSelected ? AppColors.accent : AppColors.textSecondary,
               ),
             ),
           ],
@@ -1707,12 +1750,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Color? colorDot,
     required bool selected,
     required VoidCallback onSelected,
+    VoidCallback? onLongPress,
   }) {
     return Padding(
       padding: const EdgeInsets.only(right: 6.0),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onSelected,
+        onLongPress: onLongPress,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(

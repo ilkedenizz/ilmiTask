@@ -5,16 +5,25 @@ import '../theme/app_colors.dart';
 
 class CategoryManagementDialog extends StatefulWidget {
   final ReminderRepository repository;
+  final CategoryModel? initialCategoryToEdit;
 
-  const CategoryManagementDialog({super.key, required this.repository});
+  const CategoryManagementDialog({
+    super.key,
+    required this.repository,
+    this.initialCategoryToEdit,
+  });
 
   static Future<void> show(
     BuildContext context, {
     required ReminderRepository repository,
+    CategoryModel? initialCategoryToEdit,
   }) {
     return showDialog(
       context: context,
-      builder: (context) => CategoryManagementDialog(repository: repository),
+      builder: (context) => CategoryManagementDialog(
+        repository: repository,
+        initialCategoryToEdit: initialCategoryToEdit,
+      ),
     );
   }
 
@@ -27,6 +36,7 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
   final TextEditingController _nameController = TextEditingController();
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
+  CategoryModel? _editingCategory;
 
   final List<String> _colorPresets = [
     '#FF5500', // International Orange
@@ -43,7 +53,13 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedColorHex = _colorPresets.first;
+    if (widget.initialCategoryToEdit != null) {
+      _editingCategory = widget.initialCategoryToEdit;
+      _nameController.text = widget.initialCategoryToEdit!.name;
+      _selectedColorHex = widget.initialCategoryToEdit!.colorHex;
+    } else {
+      _selectedColorHex = _colorPresets.first;
+    }
     _loadCategories();
   }
 
@@ -71,41 +87,55 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
     }
   }
 
-  Future<void> _addCategory() async {
+  Future<void> _saveCategory() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
-    final newCat = CategoryModel(
-      name: name,
-      colorHex: _selectedColorHex,
-      iconCode: Icons.folder.codePoint,
-    );
-
-    await widget.repository.insertCategory(newCat);
+    if (_editingCategory != null) {
+      final updated = _editingCategory!.copyWith(
+        name: name,
+        colorHex: _selectedColorHex,
+      );
+      await widget.repository.updateCategory(updated);
+      _editingCategory = null;
+    } else {
+      final newCat = CategoryModel(
+        name: name,
+        colorHex: _selectedColorHex,
+        iconCode: Icons.folder.codePoint,
+      );
+      await widget.repository.insertCategory(newCat);
+    }
     _nameController.clear();
     await _loadCategories();
   }
 
   Future<void> _deleteCategory(int id) async {
     await widget.repository.deleteCategory(id);
+    if (_editingCategory?.id == id) {
+      _editingCategory = null;
+      _nameController.clear();
+    }
     await _loadCategories();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = _editingCategory != null;
+
     return AlertDialog(
       backgroundColor: AppColors.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppColors.cardBorder),
       ),
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.category_outlined, color: AppColors.accent, size: 20),
-          SizedBox(width: 8),
+          const Icon(Icons.category_outlined, color: AppColors.accent, size: 20),
+          const SizedBox(width: 8),
           Text(
-            'Manage Categories',
-            style: TextStyle(
+            isEditing ? 'Edit Category' : 'Manage Categories',
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -121,14 +151,40 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Add Category',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMuted,
-                  letterSpacing: 0.5,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isEditing
+                        ? 'EDIT: ${_editingCategory!.name.toUpperCase()}'
+                        : 'ADD CATEGORY',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isEditing ? AppColors.accent : AppColors.textMuted,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  if (isEditing)
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _editingCategory = null;
+                          _nameController.clear();
+                          _selectedColorHex = _colorPresets.first;
+                        });
+                      },
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Row(
@@ -183,9 +239,9 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    onPressed: _addCategory,
-                    icon: const Icon(Icons.add, size: 20),
-                    tooltip: 'Save Category',
+                    onPressed: _saveCategory,
+                    icon: Icon(isEditing ? Icons.check : Icons.add, size: 20),
+                    tooltip: isEditing ? 'Update Category' : 'Save Category',
                   ),
                 ],
               ),
@@ -253,29 +309,67 @@ class _CategoryManagementDialogState extends State<CategoryManagementDialog> {
               else
                 ..._categories.map((cat) {
                   final catColor = _parseColor(cat.colorHex);
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    leading: CircleAvatar(
-                      backgroundColor: catColor,
-                      radius: 5,
+                  final isCurrentlyEditing = _editingCategory?.id == cat.id;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    decoration: BoxDecoration(
+                      color: isCurrentlyEditing
+                          ? AppColors.surfaceInteractive
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: isCurrentlyEditing
+                          ? Border.all(color: AppColors.accent.withValues(alpha: 0.5))
+                          : null,
                     ),
-                    title: Text(
-                      cat.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                      dense: true,
+                      leading: CircleAvatar(
+                        backgroundColor: catColor,
+                        radius: 5,
                       ),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                        color: AppColors.danger,
+                      title: Text(
+                        cat.name,
+                        style: TextStyle(
+                          fontWeight: isCurrentlyEditing
+                              ? FontWeight.w700
+                              : FontWeight.w600,
+                          fontSize: 13,
+                          color: isCurrentlyEditing
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                        ),
                       ),
-                      tooltip: 'Delete',
-                      onPressed: () => _deleteCategory(cat.id!),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              size: 17,
+                              color: AppColors.textSecondary,
+                            ),
+                            tooltip: 'Edit',
+                            onPressed: () {
+                              setState(() {
+                                _editingCategory = cat;
+                                _nameController.text = cat.name;
+                                _selectedColorHex = cat.colorHex;
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 17,
+                              color: AppColors.danger,
+                            ),
+                            tooltip: 'Delete',
+                            onPressed: () => _deleteCategory(cat.id!),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }),
