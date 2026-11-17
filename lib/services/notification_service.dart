@@ -25,9 +25,17 @@ class NotificationService {
   /// Offset applied to create unique notification IDs for early alerts
   static const int earlyAlertIdOffset = 100000;
 
+  /// Offset applied to create unique notification IDs for one-off snoozes
+  static const int snoozeIdOffset = 200000;
+
   /// Action IDs for interactive notification buttons
   static const String actionComplete = 'action_complete';
   static const String actionSnooze = 'action_snooze';
+
+  /// Snooze duration used by notification + alarm screen actions
+  static const Duration snoozeDuration = Duration(minutes: 10);
+
+  bool _tzReady = false;
 
   // Singleton instance
   static NotificationService instance = NotificationService._internal();
@@ -111,7 +119,15 @@ class NotificationService {
     _isInitialized = true;
   }
 
+  /// Prepares timezone data only (safe to call from a background isolate
+  /// where the plugin was already initialized by the main isolate).
+  void ensureTimeZoneReady() {
+    if (_tzReady) return;
+    _setupTimeZone();
+  }
+
   void _setupTimeZone() {
+    _tzReady = true;
     try {
       tz.initializeTimeZones();
     } catch (e) {
@@ -342,6 +358,7 @@ class NotificationService {
   /// Schedules main notification and early pre-alert notification for a reminder
   Future<void> scheduleReminderNotification(Reminder reminder) async {
     if (reminder.id == null) return;
+    ensureTimeZoneReady();
 
     // If due_datetime is null or reminder is completed, cancel existing alarms and exit
     if (reminder.dueDatetime == null || reminder.isCompleted) {
@@ -472,10 +489,41 @@ class NotificationService {
     }
   }
 
-  /// Cancels both main and early alert notifications for a reminder ID
+  /// Schedules a one-off snooze alert [snoozeDuration] from now under a
+  /// dedicated ID so repeating schedules stay untouched.
+  Future<DateTime?> scheduleSnoozeNotification(Reminder reminder) async {
+    if (reminder.id == null) return null;
+    ensureTimeZoneReady();
+    final at = DateTime.now().add(snoozeDuration);
+    final title = reminder.title;
+    final body = reminder.notes?.trim().isNotEmpty == true
+        ? reminder.notes!
+        : 'Snoozed reminder';
+    await _notificationsPlugin.zonedSchedule(
+      id: reminder.id! + snoozeIdOffset,
+      title: title,
+      body: body,
+      scheduledDate: tz.TZDateTime.from(at, tz.local),
+      notificationDetails: _buildNotificationDetails(
+        alertSeverity: reminder.alertSeverity,
+        title: title,
+        body: body,
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: 'reminder_${reminder.id}',
+    );
+    return at;
+  }
+
+  /// Cancels main, early alert and snooze notifications for a reminder ID
   Future<void> cancelReminderNotification(int reminderId) async {
-    await _notificationsPlugin.cancel(id: reminderId);
-    await _notificationsPlugin.cancel(id: reminderId + earlyAlertIdOffset);
+    try {
+      await _notificationsPlugin.cancel(id: reminderId);
+      await _notificationsPlugin.cancel(id: reminderId + earlyAlertIdOffset);
+      await _notificationsPlugin.cancel(id: reminderId + snoozeIdOffset);
+    } catch (e) {
+      debugPrint('cancelReminderNotification warning: $e');
+    }
   }
 
   /// Cancels all notifications managed by the app

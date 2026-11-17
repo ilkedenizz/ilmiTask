@@ -7,6 +7,7 @@ import '../data/models/reminder_model.dart';
 import '../data/models/subtask_model.dart';
 import '../data/repositories/reminder_repository.dart';
 import '../l10n/app_strings.dart';
+import '../services/app_events.dart';
 import '../services/geofence_service.dart';
 import '../services/widget_service.dart';
 import '../theme/app_colors.dart';
@@ -28,7 +29,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final ReminderRepository _repository;
   final TextEditingController _searchController = TextEditingController();
 
@@ -44,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   HomeViewMode _viewMode = HomeViewMode.list;
   late DateTime _selectedAgendaDate;
   late DateTime _agendaViewMonth;
+  bool _agendaSlideForward = true;
 
   @override
   void initState() {
@@ -54,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _repository = widget.repository ?? ReminderRepository();
     _loadData();
+    WidgetsBinding.instance.addObserver(this);
+    AppEvents.reminderDataRevision.addListener(_onExternalDataChange);
 
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       GeofenceMonitorService().startMonitoring(repository: _repository);
@@ -62,13 +66,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Background notification actions write SQLite from another isolate;
+    // pick those changes up as soon as the user returns to the app.
+    if (state == AppLifecycleState.resumed) {
+      _loadData(silent: true);
+    }
+  }
+
+  void _onExternalDataChange() {
+    if (mounted) _loadData(silent: true);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    AppEvents.reminderDataRevision.removeListener(_onExternalDataChange);
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
     try {
       final categories = await _repository.getAllCategories();
       final reminders = await _repository.getAllReminders();
@@ -952,10 +971,50 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- CALENDAR / AGENDA VIEW ---
-  Widget _buildCalendarAgendaView(AppStrings strings) {
-    final monthTitle =
-        DateFormat('MMMM yyyy').format(_agendaViewMonth).toUpperCase();
+  String _upper(AppStrings strings, String s) =>
+      strings.isTr ? s.replaceAll('i', 'İ').toUpperCase() : s.toUpperCase();
 
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Color _categoryColorFor(Reminder r) {
+    if (r.categoryId == null) return AppColors.textMuted;
+    for (final c in _categories) {
+      if (c.id == r.categoryId) return _parseColor(c.colorHex);
+    }
+    return AppColors.textMuted;
+  }
+
+  void _shiftAgendaMonth(int delta) {
+    setState(() {
+      _agendaSlideForward = delta > 0;
+      _agendaViewMonth = DateTime(
+        _agendaViewMonth.year,
+        _agendaViewMonth.month + delta,
+        1,
+      );
+    });
+  }
+
+  void _jumpAgendaToToday() {
+    final now = DateTime.now();
+    final target = DateTime(now.year, now.month, 1);
+    setState(() {
+      _agendaSlideForward = target.isAfter(_agendaViewMonth);
+      _agendaViewMonth = target;
+      _selectedAgendaDate = DateTime(now.year, now.month, now.day);
+    });
+  }
+
+  DateTime get _selectedAgendaNoon => DateTime(
+        _selectedAgendaDate.year,
+        _selectedAgendaDate.month,
+        _selectedAgendaDate.day,
+        12,
+        0,
+      );
+
+  Widget _buildCalendarAgendaView(AppStrings strings) {
     final daysInMonth = DateTime(
       _agendaViewMonth.year,
       _agendaViewMonth.month + 1,
@@ -969,20 +1028,35 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final agendaTasks = _agendaRemindersForSelectedDate;
 
-    final formattedAgendaDate = DateFormat('d MMMM y, EEEE')
-        .format(_selectedAgendaDate)
-        .toUpperCase();
+    // Bucket the month's reminders by day once (O(n)) for cell previews.
+    final Map<int, List<Reminder>> byDay = {};
+    for (final r in _allReminders) {
+      final d = r.dueDatetime;
+      if (d == null) continue;
+      if (d.year != _agendaViewMonth.year || d.month != _agendaViewMonth.month) {
+        continue;
+      }
+      byDay.putIfAbsent(d.day, () => []).add(r);
+    }
+    for (final list in byDay.values) {
+      list.sort((a, b) {
+        if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
+        return a.dueDatetime!.compareTo(b.dueDatetime!);
+      });
+    }
 
-    final weekdayLabels = strings.isTr
-        ? const ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ']
-        : const ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    final isViewingCurrentMonth = _agendaViewMonth.year == today.year &&
+        _agendaViewMonth.month == today.month;
+    final pendingCount = agendaTasks.where((r) => !r.isCompleted).length;
+    final doneCount = agendaTasks.length - pendingCount;
+    final monthKey = '${_agendaViewMonth.year}-${_agendaViewMonth.month}';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 88),
       children: [
         // Calendar Card Surface
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(14),
@@ -992,57 +1066,75 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               // Month navigator
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(
-                      Icons.chevron_left,
-                      color: AppColors.textSecondary,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _agendaViewMonth = DateTime(
-                          _agendaViewMonth.year,
-                          _agendaViewMonth.month - 1,
-                          1,
-                        );
-                      });
-                    },
-                    tooltip: 'Previous month',
+                    key: const Key('agenda_prev_month'),
+                    icon: const Icon(Icons.chevron_left,
+                        color: AppColors.textSecondary),
+                    onPressed: () => _shiftAgendaMonth(-1),
+                    tooltip: strings.isTr ? 'Önceki ay' : 'Previous month',
                   ),
-                  Text(
-                    monthTitle,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      letterSpacing: 1.0,
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: Text(
+                        _upper(strings, strings.monthYear(_agendaViewMonth)),
+                        key: ValueKey('title_$monthKey'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
                     ),
                   ),
+                  if (!isViewingCurrentMonth ||
+                      !_isSameDay(_selectedAgendaDate, today))
+                    Tooltip(
+                      message: strings.agendaJumpToday,
+                      child: InkWell(
+                        key: const Key('agenda_jump_today'),
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: _jumpAgendaToToday,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: AppColors.accent.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: Text(
+                            strings.agendaToday,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.accent,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   IconButton(
-                    icon: const Icon(
-                      Icons.chevron_right,
-                      color: AppColors.textSecondary,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _agendaViewMonth = DateTime(
-                          _agendaViewMonth.year,
-                          _agendaViewMonth.month + 1,
-                          1,
-                        );
-                      });
-                    },
-                    tooltip: 'Next month',
+                    key: const Key('agenda_next_month'),
+                    icon: const Icon(Icons.chevron_right,
+                        color: AppColors.textSecondary),
+                    onPressed: () => _shiftAgendaMonth(1),
+                    tooltip: strings.isTr ? 'Sonraki ay' : 'Next month',
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
 
               // Weekday labels
               Row(
-                children: weekdayLabels
+                children: strings.weekdayShort
                     .map(
                       (w) => Expanded(
                         child: Center(
@@ -1050,7 +1142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             w,
                             style: const TextStyle(
                               fontFamily: 'monospace',
-                              fontSize: 10,
+                              fontSize: 9.5,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textMuted,
                             ),
@@ -1060,103 +1152,74 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                     .toList(),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
-              // Calendar Days Grid
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: leadingEmptyCount + daysInMonth,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: 6,
-                  crossAxisSpacing: 6,
-                  childAspectRatio: 1.15,
-                ),
-                itemBuilder: (ctx, index) {
-                  if (index < leadingEmptyCount) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final day = index - leadingEmptyCount + 1;
-                  final cellDate = DateTime(
-                    _agendaViewMonth.year,
-                    _agendaViewMonth.month,
-                    day,
-                  );
-                  final isSelected = cellDate.year == _selectedAgendaDate.year &&
-                      cellDate.month == _selectedAgendaDate.month &&
-                      cellDate.day == _selectedAgendaDate.day;
-                  final isToday = cellDate.year == today.year &&
-                      cellDate.month == today.month &&
-                      cellDate.day == today.day;
-
-                  final hasReminders = _allReminders.any((r) {
-                    if (r.dueDatetime == null) return false;
-                    final d = r.dueDatetime!;
-                    return d.year == cellDate.year &&
-                        d.month == cellDate.month &&
-                        d.day == cellDate.day;
-                  });
-
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      setState(() => _selectedAgendaDate = cellDate);
-                    },
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.accent
-                            : (isToday
-                                ? AppColors.surfaceInteractive
-                                : Colors.transparent),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.accent
-                              : (isToday
-                                  ? AppColors.accent.withValues(alpha: 0.5)
-                                  : Colors.transparent),
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '$day',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                              fontWeight: isSelected || isToday
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: isSelected
-                                  ? AppColors.canvas
-                                  : (isToday
-                                      ? AppColors.accent
-                                      : AppColors.textPrimary),
-                            ),
-                          ),
-                          if (hasReminders) ...[
-                            const SizedBox(height: 2),
-                            Container(
-                              width: 4,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isSelected
-                                    ? AppColors.canvas
-                                    : AppColors.accent,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
+              // Calendar Days Grid (swipeable, animated per month)
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragEnd: (details) {
+                  final v = details.primaryVelocity ?? 0;
+                  if (v < -250) _shiftAgendaMonth(1);
+                  if (v > 250) _shiftAgendaMonth(-1);
                 },
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final isIncoming =
+                        child.key == ValueKey('grid_$monthKey');
+                    final dir = _agendaSlideForward ? 1.0 : -1.0;
+                    final begin = Offset(isIncoming ? 0.12 * dir : -0.12 * dir, 0);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: begin,
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    );
+                  },
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: Alignment.topCenter,
+                    children: [...previous, ?current],
+                  ),
+                  child: GridView.builder(
+                    key: ValueKey('grid_$monthKey'),
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: leadingEmptyCount + daysInMonth,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 7,
+                      mainAxisSpacing: 4,
+                      crossAxisSpacing: 4,
+                      mainAxisExtent: 66,
+                    ),
+                    itemBuilder: (ctx, index) {
+                      if (index < leadingEmptyCount) {
+                        return const SizedBox.shrink();
+                      }
+                      final day = index - leadingEmptyCount + 1;
+                      final cellDate = DateTime(
+                        _agendaViewMonth.year,
+                        _agendaViewMonth.month,
+                        day,
+                      );
+                      return _buildCalendarCell(
+                        strings: strings,
+                        cellDate: cellDate,
+                        tasks: byDay[day] ?? const [],
+                        isSelected: _isSameDay(cellDate, _selectedAgendaDate),
+                        isToday: _isSameDay(cellDate, today),
+                        isPast: cellDate.isBefore(today),
+                      );
+                    },
+                  ),
+                ),
               ),
             ],
           ),
@@ -1167,123 +1230,294 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              width: 3,
+              height: 30,
               decoration: BoxDecoration(
-                color: AppColors.surfaceInteractive,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: AppColors.cardBorder),
-              ),
-              child: Text(
-                '${agendaTasks.length} ${strings.isTr ? 'GÖREV' : 'TASKS'}',
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.accent,
-                  letterSpacing: 0.8,
-                ),
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                formattedAgendaDate,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  letterSpacing: 0.5,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _upper(strings, strings.agendaDate(_selectedAgendaDate)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    agendaTasks.isEmpty
+                        ? strings.agendaTaskCount(0)
+                        : strings.agendaSummary(pendingCount, doneCount),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
               ),
             ),
             IconButton(
+              key: const Key('agenda_header_add'),
               icon: const Icon(Icons.add_circle_outline, color: AppColors.accent),
-              tooltip: strings.addReminderFab,
-              onPressed: () => _openEditor(
-                null,
-                DateTime(
-                  _selectedAgendaDate.year,
-                  _selectedAgendaDate.month,
-                  _selectedAgendaDate.day,
-                  12,
-                  0,
-                ),
-              ),
+              tooltip: strings.addForThisDay,
+              onPressed: () => _openEditor(null, _selectedAgendaNoon),
             ),
           ],
         ),
         const SizedBox(height: 8),
 
-        // Tasks for selected date
-        if (agendaTasks.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.cardBorder),
+        // Tasks for selected date — animated per selected day
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SizeTransition(
+              sizeFactor: animation,
+              alignment: Alignment.topCenter,
+              child: child,
             ),
-            child: Column(
+          ),
+          child: KeyedSubtree(
+            key: ValueKey(
+                'agenda_${_selectedAgendaDate.toIso8601String()}_${agendaTasks.length}'),
+            child: agendaTasks.isEmpty
+                ? _buildAgendaEmptyState(strings)
+                : Column(
+                    children: [
+                      for (int i = 0; i < agendaTasks.length; i++)
+                        _buildAgendaTimelineRow(
+                          strings,
+                          agendaTasks[i],
+                          isLast: i == agendaTasks.length - 1,
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCalendarCell({
+    required AppStrings strings,
+    required DateTime cellDate,
+    required List<Reminder> tasks,
+    required bool isSelected,
+    required bool isToday,
+    required bool isPast,
+  }) {
+    const maxPreviews = 2;
+    final previews = tasks.take(maxPreviews).toList();
+    final overflow = tasks.length - previews.length;
+
+    final Color dayColor = isSelected
+        ? AppColors.canvas
+        : (isToday
+            ? AppColors.accent
+            : (isPast ? AppColors.textMuted : AppColors.textPrimary));
+
+    return InkWell(
+      key: ValueKey(
+          'cal_cell_${cellDate.year}_${cellDate.month}_${cellDate.day}'),
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => setState(() => _selectedAgendaDate = cellDate),
+      onLongPress: () {
+        setState(() => _selectedAgendaDate = cellDate);
+        _openEditor(
+          null,
+          DateTime(cellDate.year, cellDate.month, cellDate.day, 12, 0),
+        );
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.fromLTRB(3, 3, 3, 2),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.accent.withValues(alpha: 0.14)
+              : (tasks.isNotEmpty
+                  ? AppColors.surfaceInteractive
+                  : Colors.transparent),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.accent
+                : (isToday
+                    ? AppColors.accent.withValues(alpha: 0.45)
+                    : (tasks.isNotEmpty
+                        ? AppColors.cardBorder
+                        : Colors.transparent)),
+            width: isSelected ? 1.4 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                const Icon(
-                  Icons.event_available_outlined,
-                  size: 36,
-                  color: AppColors.borderInteractive,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  strings.emptyAgendaTitle,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13.5,
-                    color: AppColors.textPrimary,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 15,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  strings.emptyAgendaSubtitle,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.accent),
-                    foregroundColor: AppColors.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  child: Text(
+                    '${cellDate.day}',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      height: 1.0,
+                      fontWeight: isSelected || isToday
+                          ? FontWeight.w800
+                          : FontWeight.w500,
+                      color: dayColor,
                     ),
                   ),
-                  onPressed: () => _openEditor(
-                    null,
-                    DateTime(
-                      _selectedAgendaDate.year,
-                      _selectedAgendaDate.month,
-                      _selectedAgendaDate.day,
-                      12,
-                      0,
-                    ),
-                  ),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: Text(
-                    strings.addReminderFab,
+                ),
+                const Spacer(),
+                if (overflow > 0)
+                  Text(
+                    strings.agendaMore(overflow),
                     style: const TextStyle(
                       fontFamily: 'monospace',
-                      fontSize: 11,
+                      fontSize: 8,
                       fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
                     ),
                   ),
-                ),
               ],
             ),
-          )
-        else
-          ...agendaTasks.map(
-            (r) => ReminderCard(
+            const SizedBox(height: 3),
+            for (final r in previews)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: _buildCellSnippet(r),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCellSnippet(Reminder r) {
+    final color = _categoryColorFor(r);
+    final time = r.dueDatetime != null
+        ? DateFormat('HH:mm').format(r.dueDatetime!)
+        : '';
+    return Container(
+      height: 20,
+      padding: const EdgeInsets.only(left: 3, right: 1),
+      decoration: BoxDecoration(
+        color: AppColors.canvas.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(3),
+        border: Border(left: BorderSide(color: color, width: 2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            r.title,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            softWrap: false,
+            style: TextStyle(
+              fontSize: 7.5,
+              height: 1.1,
+              fontWeight: FontWeight.w600,
+              color: r.isCompleted
+                  ? AppColors.textMuted
+                  : AppColors.textPrimary,
+              decoration: r.isCompleted ? TextDecoration.lineThrough : null,
+            ),
+          ),
+          Text(
+            time,
+            maxLines: 1,
+            softWrap: false,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 6.5,
+              height: 1.1,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgendaTimelineRow(
+    AppStrings strings,
+    Reminder r, {
+    required bool isLast,
+  }) {
+    final color = _categoryColorFor(r);
+    final due = r.dueDatetime;
+    final timeLabel = due != null ? DateFormat('HH:mm').format(due) : '--:--';
+    final isOverdue =
+        due != null && !r.isCompleted && due.isBefore(DateTime.now());
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 48,
+            child: Column(
+              children: [
+                const SizedBox(height: 14),
+                Text(
+                  timeLabel,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: r.isCompleted
+                        ? AppColors.textMuted
+                        : (isOverdue ? AppColors.danger : AppColors.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: r.isCompleted ? Colors.transparent : color,
+                    border: Border.all(color: color, width: 1.5),
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 1,
+                      margin: const EdgeInsets.only(top: 4),
+                      color: AppColors.cardBorder,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: ReminderCard(
               key: ValueKey('agenda_${r.id}'),
               reminder: r,
               onToggleComplete: (val) => _toggleComplete(r, val),
@@ -1293,7 +1527,80 @@ class _HomeScreenState extends State<HomeScreen> {
               onToggleSubtask: _toggleSubtask,
             ),
           ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgendaEmptyState(AppStrings strings) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.accent.withValues(alpha: 0.08),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.35),
+              ),
+            ),
+            child: const Icon(
+              Icons.event_available_outlined,
+              size: 22,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            strings.emptyAgendaTitle,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13.5,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            strings.emptyAgendaSubtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            key: const Key('agenda_empty_add'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.canvas,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => _openEditor(null, _selectedAgendaNoon),
+            icon: const Icon(Icons.add, size: 16),
+            label: Text(
+              strings.addForThisDay,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -55,6 +55,43 @@ class AppStrings {
   String get viewList => isTr ? 'LİSTE' : 'LIST';
   String get viewCalendar => isTr ? 'AJANDA' : 'AGENDA';
 
+  // --- AGENDA / CALENDAR ---
+  String get addForThisDay => isTr ? 'Bu güne hatırlatıcı ekle' : 'Add reminder for this day';
+  String get agendaToday => isTr ? 'BUGÜN' : 'TODAY';
+  String get agendaJumpToday => isTr ? 'Bugüne git' : 'Go to today';
+  String get agendaAllDay => isTr ? 'GÜN BOYU' : 'ALL DAY';
+  String agendaTaskCount(int n) => isTr ? '$n GÖREV' : '$n ${n == 1 ? 'TASK' : 'TASKS'}';
+  String agendaMore(int n) => '+$n';
+  String agendaSummary(int pending, int done) => isTr
+      ? '$pending bekleyen · $done tamamlanan'
+      : '$pending pending · $done done';
+
+  static const _trMonths = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+  ];
+  static const _enMonths = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  static const _trWeekdays = [
+    'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar',
+  ];
+  static const _enWeekdays = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  ];
+
+  String monthName(int month) => (isTr ? _trMonths : _enMonths)[month - 1];
+  String weekdayName(int weekday) => (isTr ? _trWeekdays : _enWeekdays)[weekday - 1];
+  List<String> get weekdayShort => isTr
+      ? const ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ']
+      : const ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+
+  String monthYear(DateTime d) => '${monthName(d.month)} ${d.year}'.toUpperCase();
+  String agendaDate(DateTime d) => isTr
+      ? '${d.day} ${monthName(d.month)} ${d.year}, ${weekdayName(d.weekday)}'
+      : '${weekdayName(d.weekday)}, ${monthName(d.month)} ${d.day}, ${d.year}';
+
   // --- EDITOR SHEET ---
   String get titleLabel => isTr ? 'Başlık' : 'Title';
   String get titleHint => isTr ? 'Ne hatırlatılmasını istersin?' : 'What do you need to be reminded of?';

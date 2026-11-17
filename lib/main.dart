@@ -10,6 +10,7 @@ import 'l10n/app_strings.dart';
 import 'screens/alarm_ringing_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/reminder_editor_sheet.dart';
+import 'services/app_events.dart';
 import 'services/notification_service.dart';
 import 'theme/app_colors.dart';
 
@@ -24,41 +25,77 @@ void notificationTapBackground(NotificationResponse response) async {
       databaseFactory = databaseFactoryFfi;
     } catch (_) {}
   }
+  // Background isolate: plugin is already initialized by the main isolate,
+  // only timezone data must be prepared before any zonedSchedule call.
+  NotificationService.instance.ensureTimeZoneReady();
   final actionId = response.actionId;
   final payload = response.payload;
   if (actionId != null && actionId.isNotEmpty && payload != null) {
-    await handleNotificationAction(actionId, payload);
+    try {
+      await handleNotificationAction(actionId, payload);
+    } catch (e, stack) {
+      debugPrint('Background notification action failed: $e\n$stack');
+    }
   }
 }
+
+/// Extracts the reminder ID from any notification payload variant.
+/// Order matters: 'early_reminder_' must be checked before 'reminder_'.
+int? parseReminderIdFromPayload(String payload) {
+  const prefixes = ['early_reminder_', 'reminder_'];
+  for (final p in prefixes) {
+    if (payload.startsWith(p)) {
+      return int.tryParse(payload.substring(p.length));
+    }
+  }
+  return null;
+}
+
+final Set<String> _inFlightActions = <String>{};
 
 Future<void> handleNotificationAction(
   String actionId,
   String payload, {
   ReminderRepository? repository,
+  NotificationService? notificationService,
 }) async {
-  final repo = repository ?? ReminderRepository();
-  final idStr = payload
-      .replaceFirst('reminder_', '')
-      .replaceFirst('early_reminder_', '');
-  final reminderId = int.tryParse(idStr);
+  final reminderId = parseReminderIdFromPayload(payload);
   if (reminderId == null) return;
 
-  if (actionId == NotificationService.actionComplete) {
-    // Instantly mark reminder completed in SQLite and cancel notification
-    await repo.toggleReminderCompletion(reminderId, true);
-    await NotificationService.instance.cancelReminderNotification(reminderId);
-  } else if (actionId == NotificationService.actionSnooze) {
-    // Atomically reschedule exact alarm by +10 minutes
-    await NotificationService.instance.cancelReminderNotification(reminderId);
-    final reminder = await repo.getReminderById(reminderId);
-    if (reminder != null) {
-      final snoozedDue = DateTime.now().add(const Duration(minutes: 10));
-      final updated = reminder.copyWith(
-        dueDatetime: snoozedDue,
-        isCompleted: false,
-      );
-      await repo.updateReminder(updated, syncSubtasks: false);
+  // Idempotency guard: ignore rapid duplicate taps for the same action.
+  final key = '$actionId:$reminderId';
+  if (!_inFlightActions.add(key)) return;
+
+  try {
+    final service = notificationService ?? NotificationService.instance;
+    final repo = repository ?? ReminderRepository(notificationService: service);
+
+    if (actionId == NotificationService.actionComplete) {
+      // Mark done in SQLite; repository cancels main/early/snooze alarms.
+      await repo.toggleReminderCompletion(reminderId, true);
+      await service.cancelReminderNotification(reminderId);
+    } else if (actionId == NotificationService.actionSnooze) {
+      final reminder = await repo.getReminderById(reminderId);
+      if (reminder == null) return;
+
+      if (reminder.repeatRule == ReminderRepeatRule.none) {
+        // One-off reminder: move due time to now + 10m. updateReminder
+        // cancels stale alarms and schedules the new exact alarm atomically.
+        final updated = reminder.copyWith(
+          dueDatetime: DateTime.now().add(NotificationService.snoozeDuration),
+          isCompleted: false,
+        );
+        await repo.updateReminder(updated, syncSubtasks: false);
+      } else {
+        // Repeating reminder: keep the recurrence intact and add a one-off
+        // snooze alert under its own notification ID.
+        await service.scheduleSnoozeNotification(reminder);
+      }
     }
+
+    AppEvents.notifyRemindersChanged();
+  } finally {
+    _inFlightActions.remove(key);
   }
 }
 

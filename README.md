@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.44+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
   <img src="https://img.shields.io/badge/SQLite-sqflite%202.4-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
   <img src="https://img.shields.io/badge/Design-Obsidian%20%26%20Amber-FF5500?style=for-the-badge" alt="Obsidian and Amber" />
-  <img src="https://img.shields.io/badge/Tests-22%2F22%20Passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-27%2F27%20Passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests" />
   <img src="https://img.shields.io/badge/Author-Racc%20Lab-9CA3AF?style=for-the-badge" alt="Racc Lab" />
 </p>
 
@@ -55,6 +55,12 @@
 - **Actionable Notification Buttons**: Direct notification shade buttons `[ ✓ Tamamla ]` (marks reminder done in SQLite) and `[ 🕒 Ertele (+10dk) ]` (atomically reschedules alarm +10 min) without opening the app.
 - **Obsidian Android Home Screen Widget**: Bespoke 4x2 / 2x2 native app widget displaying real-time task counts for today, top agenda items, and a quick-add `+` shortcut that launches directly into task creation.
 - **Calendar & Agenda View (Takvim / Ajanda)**: Dedicated view toggle (`[ LİSTE ]` / `[ AJANDA ]`) featuring a dark monthly calendar grid, reminder date dots, and a day-by-day agenda list.
+
+### Phase 7: Polish, Schedule Visibility & Robust Background Actions
+- **Cell-Level Task Previews & Snippets**: Calendar month grid displays micro-badges per cell showing scheduled task titles, category color bars, and due times (`HH:mm`), with overflow indicators (`+n`).
+- **Smooth Calendar Transitions & Timeline**: Monthly calendar features directional sliding transitions, swipe gestures (`GestureDetector`), quick-jump `[ BUGÜN ]` shortcut, and an editorial vertical timeline for the selected day's agenda.
+- **Idempotent Background Notification Actions**: Hardened notification response handlers with background isolate timezone initialization, payload prefix resolution, dedicated snooze IDs preserving repeating schedules, and live UI synchronization via `AppEvents`.
+- **Zero-Friction Day Scheduling**: Selected date headers and empty agenda cards feature direct one-tap "Bu güne hatırlatıcı ekle" buttons pre-filling the exact date.
 
 ---
 
